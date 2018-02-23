@@ -182,6 +182,11 @@ void HUlib_drawTextLine
       w = l->f[c - l->sc].width;
       if (x+w > BASE_WIDTH)
         break;
+      if(w == 0)
+      {
+        I_Error("HUlib_drawTextLine: invalid patch size to draw '%c'", c);
+        break;
+      }
       // killough 1/18/98 -- support multiple lines:
       // CPhipps - patch drawing updated
       V_DrawNumPatch(x, y, FG, l->f[c - l->sc].lumpnum, l->cm, VPT_TRANS | VPT_STRETCH);
@@ -199,6 +204,11 @@ void HUlib_drawTextLine
   // draw the cursor if requested
   if (drawcursor && x + l->f['_' - l->sc].width <= BASE_WIDTH)
   {
+    if(l->f['_' - l->sc].width == 0)
+    {
+      I_Error("HUlib_drawTextLine: invalid patch size to draw cursor");
+      return;
+    }
     // killough 1/18/98 -- support multiple lines
     // CPhipps - patch drawing updated
     V_DrawNumPatch(x, y, FG, l->f['_' - l->sc].lumpnum, CR_DEFAULT, VPT_NONE | VPT_STRETCH);

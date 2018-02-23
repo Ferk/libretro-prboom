@@ -483,11 +483,16 @@ void S_ChangeMusic(int musicnum, int looping)
 
   // get lumpnum if neccessary
   if (!music->lumpnum)
-    {
-      char namebuf[9];
-      sprintf(namebuf, "d_%s", music->name);
-      music->lumpnum = W_GetNumForName(namebuf);
-    }
+  {
+    char namebuf[9];
+    sprintf(namebuf, "d_%s", music->name);
+    music->lumpnum = W_GetNumForName(namebuf);
+  }
+  if(music->lumpnum < 0)
+  {
+    I_Error("S_ChangeMusic: skipping missing music lump 'd_%s'", music->name);
+    return;
+  }
 
   music_file_failed = 1;
 

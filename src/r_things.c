@@ -509,10 +509,24 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    // decide which patch to use for sprite relative to player
    sprdef = &sprites[thing->sprite];
 
-   if (!sprdef->spriteframes)
-      I_Error ("R_ProjectSprite: Missing spriteframes %i : %i", thing->sprite,
-            thing->frame);
+   if (!sprdef->spriteframes) {
+      I_Error ("R_ProjectSprite: Missing frame %i for sprite %i", thing->frame,
+            thing->sprite);
+      return;
+   }
+   if (sprdef->numframes > numlumps)
+   {
+     I_Error ("R_ProjectSprite: Abnormal amount of frames %i for sprite %i",
+           sprdef->numframes, thing->sprite);
+     return;
+   }
 
+   int framenum = (thing->frame & FF_FRAMEMASK);
+   if (framenum < 0 || framenum >= sprdef->numframes) {
+      I_Error ("R_ProjectSprite: Bad frame %i/%i for sprite %i", framenum,
+            sprdef->numframes, thing->sprite);
+      return;
+   }
    sprframe = &sprdef->spriteframes[thing->frame & FF_FRAMEMASK];
 
    if (sprframe->rotate)
@@ -532,6 +546,10 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 
    {
       const rpatch_t* patch = R_CachePatchNum(lump+firstspritelump);
+      if(!patch) {
+         I_Error ("R_ProjectSprite: couldn't load lump %d", lump+firstspritelump);
+         return;
+      }
 
       /* calculate edges of the shape
        * cph 2003/08/1 - fraggle points out that this offset must be flipped
@@ -664,6 +682,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    int           x1, x2;
    spritedef_t   *sprdef;
    spriteframe_t *sprframe;
+   int           sprframenum;
    int           lump;
    boolean       flip;
    vissprite_t   *vis;
@@ -677,7 +696,21 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    sprdef = &sprites[psp->state->sprite];
 
-   sprframe = &sprdef->spriteframes[psp->state->frame & FF_FRAMEMASK];
+   if (sprdef->numframes > numlumps)
+   {
+     I_Error ("R_ProjectSprite: Abnormal amount of frames %i for player sprite",
+           sprdef->numframes);
+     return;
+   }
+
+   sprframenum = psp->state->frame & FF_FRAMEMASK;
+   if (sprframenum >= sprdef->numframes)
+   {
+      I_Error ("R_ProjectSprite: Bad frame %d/%i for player sprite", sprframenum,
+            sprdef->numframes);
+      return;
+   }
+   sprframe = &sprdef->spriteframes[sprframenum];
 
    lump = sprframe->lump[0];
    flip = (boolean) sprframe->flip[0];
@@ -973,7 +1006,6 @@ void R_DrawMasked(void)
 {
    int i;
    drawseg_t *ds;
-
    R_SortVisSprites();
 
    // draw all vissprites back to front
@@ -998,4 +1030,5 @@ void R_DrawMasked(void)
    //  but does not draw on side views
    if (!viewangleoffset)
       R_DrawPlayerSprites ();
+
 }

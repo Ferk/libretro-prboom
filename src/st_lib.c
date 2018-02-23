@@ -125,6 +125,11 @@ static void STlib_drawNum
     num = -num;
   }
 
+  if( w == 0 || h == 0 ) {
+    I_Error("STlib_drawNum: Wrong dimensions for '%d' number patch %dx%d", num, w, h);
+    return;
+  }
+
   // clear the area
   x = n->x - numdigits*w;
 

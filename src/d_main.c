@@ -344,7 +344,7 @@ static void D_PageDrawer(void)
   // proff - added M_DrawCredits
   if (pagename)
   {
-    V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+    V_DrawBackground(pagename, 0);
   }
   else
     M_DrawCredits();

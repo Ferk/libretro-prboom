@@ -94,7 +94,8 @@ void V_InitColorTranslation(void)
 {
   register const crdef_t *p;
   for (p=crdefs; p->name; p++)
-    *p->map = W_CacheLumpName(p->name);
+    if((*p->map = W_CacheLumpName(p->name)) == NULL)
+      I_Error("V_InitColorTranslation: missing lump %s", p->name);
 }
 
 //
@@ -167,6 +168,8 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
   } \
 }
 
+static void V_DrawMemPatch(int,int, int, const rpatch_t *patch,  int cm, enum patch_translation_e flags);
+
 void V_DrawBackground(const char* flatname, int scrn)
 {
   /* erase the entire screen to a tiled background */
@@ -174,19 +177,53 @@ void V_DrawBackground(const char* flatname, int scrn)
   int         lump;
   const int   w = (64*SCREENWIDTH/320), h = (64*SCREENHEIGHT/200);
 
-  // killough 4/17/98:
-  const uint8_t *src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
+  if((lump = W_CheckNumForName(flatname)) < 0) {
+    lump = firstflat + R_FlatNumForName(flatname);
+  }
+  const uint8_t *src = W_CacheLumpNum(lump);
 
-  /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
+  if(lump < 0)
+  {
+    I_Error("V_DrawBackground: missing lump won't be drawn");
+    return;
+  }
 
-  V_DRAWFLAT(scrn, int16_t, GETCOL16);
+  int len = W_LumpLength(lump);
+  I_Error("BG Length %d", len);
 
-  /* end V_DrawBlock */
-
-  for (y=0 ; y<SCREENHEIGHT ; y+=h)
-    for (x=y ? 0 : w; x<SCREENWIDTH ; x+=w)
-      V_CopyRect(0, 0, scrn, ((SCREENWIDTH-x) < w) ? (SCREENWIDTH-x) : w,
-     ((SCREENHEIGHT-y) < h) ? (SCREENHEIGHT-y) : h, x, y, scrn, VPT_NONE);
+   switch(len)
+   {
+   case 4096:  // 64x64 flat
+   case 4160:
+   case 8192:
+      //source = wGlobalDir.cacheLumpNum(lumpnum, PU_CACHE);
+      //V_DrawBackgroundCached((byte *)source, dest);
+      /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
+      V_DRAWFLAT(scrn, int16_t, GETCOL16);
+      /* end V_DrawBlock */
+      for (y=0 ; y<SCREENHEIGHT ; y+=h)
+        for (x=y ? 0 : w; x<SCREENWIDTH ; x+=w)
+          V_CopyRect(0, 0, scrn, ((SCREENWIDTH-x) < w) ? (SCREENWIDTH-x) : w,
+         ((SCREENHEIGHT-y) < h) ? (SCREENHEIGHT-y) : h, x, y, scrn, VPT_NONE);
+      break;
+   case 64000: // 320x200 linear
+      //source = wGlobalDir.cacheLumpNum(lumpnum, PU_CACHE);
+      //V_DrawBlockFS(dest, (byte *)source);
+      memcpy(screens[scrn].data, src, len);
+      /* end V_DrawBlock */
+      //for (y=0 ; y<SCREENHEIGHT ; y+=h)
+      //  for (x=y ? 0 : w; x<SCREENWIDTH ; x+=w)
+      //    V_CopyRect(0, 0, scrn, ((SCREENWIDTH-x) < w) ? (SCREENWIDTH-x) : w,
+      //   ((SCREENHEIGHT-y) < h) ? (SCREENHEIGHT-y) : h, x, y, scrn, VPT_NONE);
+      break;
+   case 76800: // 320x240 linear
+      //source = wGlobalDir.cacheLumpNum(lumpnum, PU_CACHE);
+      //V_FillBuffer(dest, (byte *)source, 320, 240);
+      break;
+   default:    // anything else is treated like a patch
+      V_DrawMemPatch(0, 0, scrn, R_CachePatchNum(lump), CR_DEFAULT, VPT_STRETCH);
+      break;
+    }
   W_UnlockLumpNum(lump);
 }
 
@@ -309,7 +346,7 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
       if (dcvars.x >= SCREENWIDTH)
          break;
 
-      dcvars.texu = ((flags & VPT_FLIP) 
+      dcvars.texu = ((flags & VPT_FLIP)
             ? ((patch->width<<FRACBITS)-col) : col) % (patch->width<<FRACBITS);
 
       // step through the posts in a column
@@ -374,7 +411,7 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
     I_Error("V_DrawNumPatch: missing lump won't be drawn");
     return;
   }
-    
+
   V_DrawMemPatch(x, y, scrn, R_CachePatchNum(lump), cm, flags);
   R_UnlockPatchNum(lump);
 }
@@ -395,20 +432,26 @@ void V_UpdateTrueColorPalette(void) {
   int gtlump         = (W_CheckNumForName)("GAMMATBL",ns_prboom);
   const uint8_t *pal = W_CacheLumpNum(pplump);
 
+  if(pplump < 0 || pplump < 0)
+  {
+    I_Error("V_UpdateTrueColorPalette: couldn't find required lumps");
+    return;
+  }
+
   // opengl doesn't use the gamma
-  const uint8_t *const gtable = 
-    (const uint8_t *)W_CacheLumpNum(gtlump) + 
+  const uint8_t *const gtable =
+    (const uint8_t *)W_CacheLumpNum(gtlump) +
     (256*(usegamma))
   ;
 
   int numPals = W_LumpLength(pplump) / (3*256);
-  
+
   if (usegammaOnLastPaletteGeneration != usegamma) {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
-    usegammaOnLastPaletteGeneration = usegamma;      
+    usegammaOnLastPaletteGeneration = usegamma;
   }
-  
+
   if (!Palettes16)
   {
      // set short palette
@@ -442,7 +485,7 @@ void V_UpdateTrueColorPalette(void) {
   }
 
   V_Palette16 = Palettes16 + paletteNum*256*VID_NUMCOLORWEIGHTS;
-   
+
   W_UnlockLumpNum(pplump);
   W_UnlockLumpNum(gtlump);
 }
