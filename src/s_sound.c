@@ -45,6 +45,7 @@
 #include "r_main.h"
 #include "m_random.h"
 #include "w_wad.h"
+#include "d_gameinfo.h"
 #include "lprintf.h"
 
 // when to clip out sounds
@@ -188,7 +189,7 @@ void S_Start(void)
   if (idmusnum!=-1)
     mnum = idmusnum; //jff 3/17/98 reload IDMUS music if not -1
   else
-    if (gamemode == commercial)
+    if (gamemodeinfo->id == commercial)
       mnum = mus_runnin + gamemap - 1;
     else
       {

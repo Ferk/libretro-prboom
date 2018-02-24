@@ -39,7 +39,7 @@
 #include "r_draw.h"
 #include "r_filter.h"
 #include "v_video.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "g_game.h"
 #include "am_map.h"
 #include "lprintf.h"

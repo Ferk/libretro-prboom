@@ -49,7 +49,7 @@
 #include "r_sky.h"
 #include "v_video.h"
 #include "lprintf.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "i_main.h"
 #include "i_system.h"
 #include "g_game.h"

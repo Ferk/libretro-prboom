@@ -37,7 +37,7 @@
 #endif
 
 #include "doomstat.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "r_main.h"
 #include "p_setup.h"
 #include "p_maputl.h"

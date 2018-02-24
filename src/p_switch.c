@@ -39,6 +39,7 @@
 #include "s_sound.h"
 #include "sounds.h"
 #include "lprintf.h"
+#include "d_gameinfo.h"
 
 // killough 2/8/98: Remove switch limit
 
@@ -70,8 +71,8 @@ button_t  buttonlist[MAXBUTTONS];
 void P_InitSwitchList(void)
 {
    int i, index = 0;
-   int episode = (gamemode == registered || gamemode==retail) ?
-      2 : gamemode == commercial ? 3 : 1;
+   int episode = (gamemodeinfo->id == registered || gamemodeinfo->id==retail) ?
+      2 : gamemodeinfo->id == commercial ? 3 : 1;
    const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
    int lump = W_GetNumForName("SWITCHES"); // cph - new wad lump handling
 

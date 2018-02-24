@@ -46,6 +46,7 @@
 #include "d_deh.h"  // Ty 03/27/98 - externalized strings
 /* cph 2006/07/23 - needs direct access to thinkercap */
 #include "p_tick.h"
+#include "d_gameinfo.h"
 
 #define plyr (players+consoleplayer)     /* the console player */
 
@@ -266,7 +267,7 @@ char buf[3];
 
   plyr->message = s_STSTR_MUS; // Ty 03/27/98 - externalized
 
-  if (gamemode == commercial)
+  if (gamemodeinfo->id == commercial)
     {
       musnum = mus_runnin + (buf[0]-'0')*10 + buf[1]-'0' - 1;
 
@@ -351,12 +352,12 @@ static void cheat_fa()
 
   // You can't own weapons that aren't in the game // phares 02/27/98
   for (i=0;i<NUMWEAPONS;i++)
-    if (!(((i == WP_PLASMA || i == WP_BFG) && gamemode == shareware) ||
-          (i == WP_SUPERSHOTGUN && gamemode != commercial)))
+    if (!(((i == WP_PLASMA || i == WP_BFG) && gamemodeinfo->id == shareware) ||
+          (i == WP_SUPERSHOTGUN && gamemodeinfo->id != commercial)))
       plyr->weaponowned[i] = TRUE;
 
   for (i=0;i<NUMAMMO;i++)
-    if (i != AM_CELL || gamemode!=shareware)
+    if (i != AM_CELL || gamemodeinfo->id!=shareware)
       plyr->ammo[i] = plyr->maxammo[i];
 
   plyr->message = s_STSTR_FAADDED;
@@ -414,7 +415,7 @@ static void cheat_clev(char buf[3])
 {
   int epsd, map;
 
-  if (gamemode == commercial)
+  if (gamemodeinfo->id == commercial)
     {
       epsd = 1; //jff was 0, but espd is 1-based
       map = (buf[0] - '0')*10 + buf[1] - '0';
@@ -427,10 +428,10 @@ static void cheat_clev(char buf[3])
 
   // Catch invalid maps.
   if (epsd < 1 || map < 1 ||   // Ohmygod - this is not going to work.
-      (gamemode == retail     && (epsd > 4 || map > 9  )) ||
-      (gamemode == registered && (epsd > 3 || map > 9  )) ||
-      (gamemode == shareware  && (epsd > 1 || map > 9  )) ||
-      (gamemode == commercial && (epsd > 1 || map > 33 )) )  //jff no 33 and 34
+      (gamemodeinfo->id == retail     && (epsd > 4 || map > 9  )) ||
+      (gamemodeinfo->id == registered && (epsd > 3 || map > 9  )) ||
+      (gamemodeinfo->id == shareware  && (epsd > 1 || map > 9  )) ||
+      (gamemodeinfo->id == commercial && (epsd > 1 || map > 33 )) )  //jff no 33 and 34
     return;                                                  //8/14/98 allowed
 
   if (!bfgedition && map == 33)
@@ -578,7 +579,7 @@ static void cheat_tntkeyxx(int key)
 
 static void cheat_tntweap()
 {                                   // Ty 03/27/98 - *not* externalized
-  plyr->message = gamemode==commercial ?           // killough 2/28/98
+  plyr->message = gamemodeinfo->id==commercial ?           // killough 2/28/98
     "Weapon number 1-9" : "Weapon number 1-8";
 }
 
@@ -587,8 +588,8 @@ char buf[3];
 {
   int w = *buf - '1';
 
-  if ((w == WP_SUPERSHOTGUN && gamemode!=commercial) ||      // killough 2/28/98
-      ((w == WP_BFG || w == WP_PLASMA) && gamemode==shareware))
+  if ((w == WP_SUPERSHOTGUN && gamemodeinfo->id!=commercial) ||      // killough 2/28/98
+      ((w == WP_BFG || w == WP_PLASMA) && gamemodeinfo->id==shareware))
     return;
 
   if (w==WP_FIST)           // make '1' apply beserker strength toggle

@@ -36,7 +36,7 @@
 #include "doomstat.h"
 #include "hu_stuff.h"
 #include "hu_lib.h"
-#include "st_stuff.h" /* jff 2/16/98 need loc of status bar */
+#include "st_doom.h" /* jff 2/16/98 need loc of status bar */
 #include "w_wad.h"
 #include "s_sound.h"
 #include "dstrings.h"
@@ -44,6 +44,7 @@
 #include "d_deh.h"   /* Ty 03/27/98 - externalization of mapnamesx arrays */
 #include "g_game.h"
 #include "r_main.h"
+#include "d_gameinfo.h"
 
 // global heads up display controls
 
@@ -548,7 +549,7 @@ void HU_Start(void)
 
   // initialize the automap's level title widget
   if (gamestate == GS_LEVEL) /* cph - stop SEGV here when not in level */
-  switch (gamemode)
+  switch (gamemodeinfo->id)
   {
     case shareware:
     case registered:
@@ -982,7 +983,7 @@ void HU_Drawer(void)
       {
         int ok=1;
         //jff avoid executing for weapons that do not exist
-        switch (gamemode)
+        switch (gamemodeinfo->id)
         {
           case shareware:
             if (w >= WP_PLASMA && w != WP_CHAINSAW)
@@ -1383,7 +1384,7 @@ void HU_Ticker(void)
               message_nottobefuckedwith = TRUE;
               message_on = TRUE;
               message_counter = HU_MSGTIMEOUT;
-              if ( gamemode == commercial )
+              if ( gamemodeinfo->id == commercial )
                 S_StartSound(0, sfx_radio);
               else
                 S_StartSound(0, sfx_tink);

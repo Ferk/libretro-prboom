@@ -61,6 +61,7 @@
 #include "i_sound.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "d_gameinfo.h"
 
 #include "../libretro/libretro.h"
 
@@ -180,10 +181,6 @@ typedef struct menu_s
 short itemOn;           // menu item skull is on (for Big Font menus)
 short skullAnimCounter; // skull animation counter
 short whichSkull;       // which skull to draw (he blinks)
-
-// graphic name of skulls
-
-const char skullName[2][/*8*/9] = {"M_SKULL1","M_SKULL2"};
 
 menu_t* currentMenu; // current menudef
 
@@ -358,7 +355,7 @@ menu_t MainDef =
 void M_DrawMainMenu(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
+  V_DrawNamePatch(94, 2, 0, gamemodeinfo->mainMenuHeader, CR_DEFAULT, VPT_STRETCH);
 }
 
 /////////////////////////////
@@ -469,7 +466,7 @@ void M_FinishHelp(int choice)        // killough 10/98
 void M_DrawReadThis1(void)
 {
   inhelpscreens = TRUE;
-  if (gamemode == shareware)
+  if (gamemodeinfo->id == shareware)
     V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
   else
     M_DrawCredits();
@@ -483,7 +480,7 @@ void M_DrawReadThis1(void)
 void M_DrawReadThis2(void)
 {
   inhelpscreens = TRUE;
-  if (gamemode == shareware)
+  if (gamemodeinfo->id == shareware)
     M_DrawCredits();
   else
     V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
@@ -542,14 +539,14 @@ void M_DrawEpisode(void)
 
 void M_Episode(int choice)
 {
-  if ( (gamemode == shareware) && choice) {
+  if ( (gamemodeinfo->id == shareware) && choice) {
     M_StartMessage(s_SWSTRING,NULL,FALSE); // Ty 03/27/98 - externalized
     M_SetupNextMenu(&ReadDef1);
     return;
   }
 
   // Yet another hack...
-  if ( (gamemode == registered) && (choice > 2))
+  if ( (gamemodeinfo->id == registered) && (choice > 2))
     {
     lprintf( LO_WARN,
      "M_Episode: 4th episode requires UltimateDOOM\n");
@@ -630,7 +627,7 @@ void M_NewGame(int choice)
     return;
   }
 
-  if ( gamemode == commercial )
+  if ( gamemodeinfo->id == commercial )
     M_SetupNextMenu(&NewDef);
   else
     M_SetupNextMenu(&EpiDef);
@@ -1029,7 +1026,7 @@ static void M_QuitResponse(int ch)
   {
     int i;
 
-    if (gamemode == commercial)
+    if (gamemodeinfo->id == commercial)
       S_StartSound(NULL,quitsounds2[(gametic>>2)&7]);
     else
       S_StartSound(NULL,quitsounds[(gametic>>2)&7]);
@@ -1050,8 +1047,6 @@ static void M_QuitResponse(int ch)
 
 void M_QuitDOOM(int choice)
 {
-  static char endstring[160];
-
   // We pick index 0 which is language sensitive,
   // or one at random, between 1 and maximum number.
   // Ty 03/27/98 - externalized DOSY as a string s_DOSY that's in the sprintf
@@ -2019,7 +2014,7 @@ static void M_DrawInstructions(void)
     case S_FILE:
       M_DrawStringCentered(160, 20, CR_SELECT, "Type/edit filename and Press ENTER");
       break;
-    case S_CHOICE: 
+    case S_CHOICE:
       M_DrawStringCentered(160, 20, CR_SELECT, "Press left or right to choose");
       break;
     case S_RESET:
@@ -2195,7 +2190,7 @@ setup_menu_t keys_settings3[] =  // Key Binding screen strings
   {"BEST"    ,S_KEY       ,m_scrn,KB_X,KB_Y+10*8,{&key_weapontoggle}},
   {"FIRE"    ,S_KEY       ,m_scrn,KB_X,KB_Y+11*8,{&key_fire},&mousebfire},
   {"NEXT"    ,S_KEY       ,m_scrn,KB_X,KB_Y+12*8,{&key_weaponcycleup}},
-  {"PREV"    ,S_KEY       ,m_scrn,KB_X,KB_Y+13*8,{&key_weaponcycledown}}, 
+  {"PREV"    ,S_KEY       ,m_scrn,KB_X,KB_Y+13*8,{&key_weaponcycledown}},
 
   {"<- PREV",S_SKIP|S_PREV,m_null,KB_PREV,KB_Y+20*8, {keys_settings2}},
   {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {keys_settings4}},
@@ -3595,7 +3590,7 @@ void M_InitExtendedHelp(void)
     i = W_CheckNumForName(namebfr);
     if (i == -1) {
       if (extended_help_count) {
-        if (gamemode == commercial) {
+        if (gamemodeinfo->id == commercial) {
           ExtHelpDef.prevMenu  = &ReadDef1; /* previous menu */
           ReadMenu1[0].routine = M_ExtHelp;
   } else {
@@ -3937,7 +3932,7 @@ void M_DrawCredits(void)     // killough 10/98: credit screen
 {
   inhelpscreens = TRUE;
   // Use V_DrawBackground here deliberately to force drawing a background
-  V_DrawBackground(gamemode==shareware ? "CEIL5_1" : "MFLR8_4", 0);
+  V_DrawBackground(gamemodeinfo->id==shareware ? "CEIL5_1" : "MFLR8_4", 0);
   M_DrawTitle(115, 9, "PRBOOM", CR_GOLD,
               PACKAGE_NAME " v" PACKAGE_VERSION, CR_GOLD);
   M_DrawScreenItems(cred_settings);
@@ -4316,7 +4311,7 @@ boolean M_Responder (event_t* ev) {
     if (ch == key_menu_left) {
       if (ptr1->var.def->type == def_int) {
         int value = *ptr1->var.def->location.pi;
-      
+
         value = value - 1;
         if ((ptr1->var.def->minvalue != UL &&
              value < ptr1->var.def->minvalue))
@@ -4344,7 +4339,7 @@ boolean M_Responder (event_t* ev) {
     if (ch == key_menu_right) {
       if (ptr1->var.def->type == def_int) {
         int value = *ptr1->var.def->location.pi;
-      
+
         value = value + 1;
         if ((ptr1->var.def->minvalue != UL &&
              value < ptr1->var.def->minvalue))
@@ -4980,70 +4975,68 @@ void M_Drawer (void)
   // Horiz. & Vertically center string and print it.
   // killough 9/29/98: simplified code, removed 40-character width limit
   if (messageToPrint)
-    {
-      /* cph - strdup string to writable memory */
-      char *ms = strdup(messageString);
-      char *p = ms;
+  {
+    /* cph - strdup string to writable memory */
+    char *ms = strdup(messageString);
+    char *p = ms;
 
-      int y = 100 - M_StringHeight(messageString)/2;
-      while (*p)
-      {
-        char *string = p, c;
-        while ((c = *p) && *p != '\n')
-          p++;
-        *p = 0;
-        M_WriteText(160 - M_StringWidth(string)/2, y, string, CR_DEFAULT);
-        y += hu_font[0].height;
-        if ((*p = c))
-          p++;
-      }
-      free(ms);
+    int y = 100 - M_StringHeight(messageString)/2;
+    while (*p)
+    {
+      char *string = p, c;
+      while ((c = *p) && *p != '\n')
+        p++;
+      *p = 0;
+      M_WriteText(160 - M_StringWidth(string)/2, y, string, CR_DEFAULT);
+      y += hu_font[0].height;
+      if ((*p = c))
+        p++;
     }
+    free(ms);
+  }
   else
     if (menuactive)
-      {
-  int x,y,max,i;
-  int lumps_missing = 0;
-
-  menuactive = mnact_float; // Boom-style menu drawers will set mnact_full
-
-  if (currentMenu->routine)
-    currentMenu->routine();     // call Draw routine
-
-  // DRAW MENU
-
-  x = currentMenu->x;
-  y = currentMenu->y;
-  max = currentMenu->numitems;
-
-  for (i = 0; i < max; i++)
-    if (currentMenu->menuitems[i].name[0])
-      if (W_CheckNumForName(currentMenu->menuitems[i].name) < 0)
-        lumps_missing++;
-
-  if (lumps_missing == 0)
-    for (i=0;i<max;i++)
     {
-      if (currentMenu->menuitems[i].name[0])
-        V_DrawNamePatch(x,y,0,currentMenu->menuitems[i].name,
-            CR_DEFAULT, VPT_STRETCH);
-      y += LINEHEIGHT;
-    }
-  else
-    for (i = 0; i < max; i++)
-    {
-      const char *alttext = currentMenu->menuitems[i].alttext;
-      if (alttext)
-        M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
-      y += LINEHEIGHT;
-    }
+      int x,y,max,i;
+      int lumps_missing = 0;
 
-  // DRAW SKULL
+      menuactive = mnact_float; // Boom-style menu drawers will set mnact_full
 
-  // CPhipps - patch drawing updated
-  V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
-      skullName[whichSkull], CR_DEFAULT, VPT_STRETCH);
-      }
+      if (currentMenu->routine)
+        currentMenu->routine();     // call Draw routine
+
+      // DRAW MENU
+
+      x = currentMenu->x;
+      y = currentMenu->y;
+      max = currentMenu->numitems;
+
+      for (i = 0; i < max; i++)
+        if (currentMenu->menuitems[i].name[0])
+          if (W_CheckNumForName(currentMenu->menuitems[i].name) < 0)
+            lumps_missing++;
+
+      if (lumps_missing == 0)
+        for (i=0;i<max;i++)
+        {
+          if (currentMenu->menuitems[i].name[0])
+            V_DrawNamePatch(x,y,0,currentMenu->menuitems[i].name,
+                CR_DEFAULT, VPT_STRETCH);
+          y += LINEHEIGHT;
+        }
+      else
+        for (i = 0; i < max; i++)
+        {
+          const char *alttext = currentMenu->menuitems[i].alttext;
+          if (alttext)
+            M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
+          y += LINEHEIGHT;
+        }
+
+      // CPhipps - patch drawing updated
+      V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
+        gamemodeinfo->menuCursor->patches[whichSkull], CR_DEFAULT, VPT_STRETCH);
+    }
 }
 
 //
@@ -5078,8 +5071,9 @@ void M_Ticker (void)
 {
   if (--skullAnimCounter <= 0)
     {
-      whichSkull ^= 1;
-      skullAnimCounter = 8;
+      skullAnimCounter = gamemodeinfo->menuCursor->blinktime;
+      if (++whichSkull >= gamemodeinfo->menuCursor->numpatches)
+         whichSkull = 0;
     }
 }
 
@@ -5283,11 +5277,11 @@ void M_InitHelpScreen(void)
   src = helpstrings;
   while (!(src->m_flags & S_END)) {
 
-    if ((strncmp(src->m_text,"PLASMA",6) == 0) && (gamemode == shareware))
+    if ((strncmp(src->m_text,"PLASMA",6) == 0) && (gamemodeinfo->id == shareware))
       src->m_flags = S_SKIP; // Don't show setting or item
-    if ((strncmp(src->m_text,"BFG",3) == 0) && (gamemode == shareware))
+    if ((strncmp(src->m_text,"BFG",3) == 0) && (gamemodeinfo->id == shareware))
       src->m_flags = S_SKIP; // Don't show setting or item
-    if ((strncmp(src->m_text,"SSG",3) == 0) && (gamemode != commercial))
+    if ((strncmp(src->m_text,"SSG",3) == 0) && (gamemodeinfo->id != commercial))
       src->m_flags = S_SKIP; // Don't show setting or item
     src++;
   }
@@ -5313,7 +5307,7 @@ void M_Init(void)
   // Here we could catch other version dependencies,
   //  like HELP1/2, and four episodes.
 
-  switch(gamemode)
+  switch(gamemodeinfo->id)
     {
     case commercial:
       // This is used because DOOM 2 had only one HELP

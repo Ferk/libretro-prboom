@@ -48,6 +48,7 @@
 #include "p_tick.h"
 #include "m_bbox.h"
 #include "lprintf.h"
+#include "d_gameinfo.h"
 
 static mobj_t *current_actor;
 
@@ -1677,7 +1678,7 @@ void A_VileChase(mobj_t* actor)
 
 		  if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
 		    totallive++;
-		  
+
                   corpsehit->health = info->spawnhealth;
       P_SetTarget(&corpsehit->target, NULL);  // killough 11/98
 
@@ -2093,7 +2094,7 @@ void A_BossDeath(mobj_t *mo)
   line_t    junk;
   int       i;
 
-  if (gamemode == commercial)
+  if (gamemodeinfo->id == commercial)
     {
       if (gamemap != 7)
         return;
@@ -2105,7 +2106,7 @@ void A_BossDeath(mobj_t *mo)
   else
     {
       // e6y
-      // Additional check of gameepisode is necessary, because 
+      // Additional check of gameepisode is necessary, because
       // there is no right or wrong solution for E4M6 in original EXEs,
       // there's nothing to emulate.
       if (comp[comp_666] && gameepisode < 4)
@@ -2117,7 +2118,7 @@ void A_BossDeath(mobj_t *mo)
         // http://www.doomworld.com/idgames/index.php?id=6909
         if (gamemap != 8)
           return;
-        if (mo->type == MT_BRUISER && gameepisode != 1) 
+        if (mo->type == MT_BRUISER && gameepisode != 1)
           return;
       }
       else
@@ -2196,7 +2197,7 @@ void A_BossDeath(mobj_t *mo)
       }
 
   // victory!
-  if ( gamemode == commercial)
+  if ( gamemodeinfo->id == commercial)
     {
       if (gamemap == 7)
         {
@@ -2459,7 +2460,7 @@ void A_SpawnFly(mobj_t *mo)
 void A_PlayerScream(mobj_t *mo)
 {
   int sound = sfx_pldeth;  // Default death sound.
-  if (gamemode != shareware && mo->health < -50)
+  if (gamemodeinfo->id != shareware && mo->health < -50)
     sound = sfx_pdiehi;   // IF THE PLAYER DIES LESS THAN -50% WITHOUT GIBBING
   S_StartSound(mo, sound);
 }

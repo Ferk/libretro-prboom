@@ -71,7 +71,10 @@ typedef enum {
   registered,   // DOOM 1 registered, E3, M27
   commercial,   // DOOM 2 retail, E1 M34  (DOOM 2 german edition not handled)
   retail,       // DOOM 1 retail, E4, M36
-  indetermined  // Well, no IWAD found.
+  hereticsw,    // Heretic shareware
+  hereticreg,   // Heretic full
+  indetermined,  // Well, no IWAD found.
+  NumGameModes
 } GameMode_t;
 
 // Mission packs - might be useful for TC stuff?
@@ -80,7 +83,12 @@ typedef enum {
   doom2,        // DOOM 2
   pack_tnt,     // TNT mission pack
   pack_plut,    // Plutonia pack
-  none
+  pack_hacx,    // HacX stand-alone IWAD
+  heretic,      // Heretic
+  hticbeta,     // Heretic Beta Version
+  hticsosr,     // Heretic - Shadow of the Serpent Riders
+  none,
+  NumGameMissions
 } GameMission_t;
 
 // Identify language to use, software localization.

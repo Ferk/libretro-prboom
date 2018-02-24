@@ -41,6 +41,7 @@
 #include "d_deh.h"  // Ty 03/22/98 - externalized strings
 #include "p_tick.h"
 #include "lprintf.h"
+#include "d_gameinfo.h"
 
 #include "p_inter.h"
 #include "p_enemy.h"
@@ -350,7 +351,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       break;
 
     case SPR_MEGA:
-      if (gamemode != commercial)
+      if (gamemodeinfo->id != commercial)
         return;
       player->health = mega_health;
       player->mo->health = player->health;

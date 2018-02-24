@@ -39,7 +39,7 @@
 #include "p_map.h"
 #include "p_tick.h"
 #include "sounds.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "hu_stuff.h"
 #include "s_sound.h"
 #include "info.h"
@@ -47,6 +47,7 @@
 #include "p_inter.h"
 #include "lprintf.h"
 #include "r_demo.h"
+#include "d_gameinfo.h"
 
 //
 // P_SetMobjState
@@ -534,13 +535,13 @@ floater:
      *  demos would desync in close lost soul fights.
      * cph - revised 2001/04/15 -
      * This was a bug in the Doom/Doom 2 source; the following code
-     *  is meant to make charging lost souls bounce off of floors, but it 
+     *  is meant to make charging lost souls bounce off of floors, but it
      *  was incorrectly placed after momz was set to 0.
-     *  However, this bug was fixed in Doom95, Final/Ultimate Doom, and 
-     *  the v1.10 source release (which is one reason why it failed to sync 
+     *  However, this bug was fixed in Doom95, Final/Ultimate Doom, and
+     *  the v1.10 source release (which is one reason why it failed to sync
      *  some Doom2 v1.9 demos)
-     * I've added a comp_soul compatibility option to make this behavior 
-     *  selectable for PrBoom v2.3+. For older demos, we do this here only 
+     * I've added a comp_soul compatibility option to make this behavior
+     *  selectable for PrBoom v2.3+. For older demos, we do this here only
      *  if we're in a compatibility level above Doom 2 v1.9 (in which case we
      *  mimic the bug and do it further down instead)
      */
@@ -575,7 +576,7 @@ floater:
       }
     mo->z = mo->floorz;
 
-    /* cph 2001/04/15 - 
+    /* cph 2001/04/15 -
      * This is the buggy lost-soul bouncing code referenced above.
      * We've already set momz = 0 normally by this point, so it's useless.
      * However we might still have upward momentum, in which case this will
@@ -601,7 +602,7 @@ floater:
 
   if (mo->z + mo->height > mo->ceilingz)
     {
-    /* cph 2001/04/15 - 
+    /* cph 2001/04/15 -
      * Lost souls were meant to bounce off of ceilings;
      *  new comp_soul compatibility option added
      */
@@ -615,9 +616,9 @@ floater:
 
     mo->z = mo->ceilingz - mo->height;
 
-    /* cph 2001/04/15 - 
-     * We might have hit a ceiling but had downward momentum (e.g. ceiling is 
-     *  lowering on us), so for old demos we must still do the buggy 
+    /* cph 2001/04/15 -
+     * We might have hit a ceiling but had downward momentum (e.g. ceiling is
+     *  lowering on us), so for old demos we must still do the buggy
      *  momentum reversal here
      */
     if (comp[comp_soul] && mo->flags & MF_SKULLFLY)
@@ -1069,7 +1070,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
    */
   if (!mthing->options)
     I_Error("P_SpawnPlayer: attempt to spawn player at unavailable start point");
-  
+
   x    = mthing->x << FRACBITS;
   y    = mthing->y << FRACBITS;
   z    = ONFLOORZ;
@@ -1107,7 +1108,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
 
   if (mthing->type-1 == consoleplayer)
     {
-    ST_Start(); // wake up the status bar
+    gamemodeinfo->statusbar->start(); // wake up the status bar
     HU_Start(); // wake up the heads up text
     }
     R_SmoothPlaying_Reset(p); // e6y
@@ -1122,7 +1123,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
 boolean P_IsDoomnumAllowed(int doomnum)
 {
   // Do not spawn cool, new monsters if !commercial
-  if (gamemode != commercial)
+  if (gamemodeinfo->id != commercial)
     switch(doomnum)
       {
       case 64:  // Archvile

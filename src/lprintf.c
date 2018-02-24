@@ -44,6 +44,10 @@
 #include "i_main.h"
 #include "m_argv.h"
 
+#ifndef __LIBRETRO__
+#include "libretro.h"
+#endif
+
 /* cphipps - enlarged message buffer and made non-static
  * We still have to be careful here, this function can be called after exit
  */
@@ -76,7 +80,6 @@ int lprintf(OutputLevels pri, const char *s, ...)
  * low-level safe exit function.
  * killough 3/20/98: add const
  */
-
 bool I_Error(const char *error, ...)
 {
   char errmsg[MAX_MESSAGE_SIZE];
@@ -91,3 +94,20 @@ bool I_Error(const char *error, ...)
   lprintf(LO_ERROR, "%s\n", errmsg);
   return false;
 }
+
+#ifndef __LIBRETRO__
+/* Meant to notify user, in libretro it uses the OSD */
+void I_Message(const char *str, ...)
+{
+  char msg[MAX_MESSAGE_SIZE];
+  va_list argptr;
+  va_start(argptr,str);
+#ifdef HAVE_VSNPRINTF
+  vsnprintf(msg,sizeof(msg),str,argptr);
+#else
+  vsprintf(msg,str,argptr);
+#endif
+  va_end(argptr);
+  lprintf(LO_ERROR, "Message: %s\n", msg);
+}
+#endif

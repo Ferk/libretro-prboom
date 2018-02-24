@@ -33,9 +33,9 @@
  */
 
 #include "doomstat.h"
+#include "d_gameinfo.h"
 
 // Game Mode - identify IWAD as shareware, retail etc.
-GameMode_t gamemode = indetermined;
 GameMission_t   gamemission = doom;
 
 // Language.
@@ -94,4 +94,3 @@ int flashing_hom;     // killough 10/98
 int doom_weapon_toggles; // killough 10/98
 
 int monkeys, default_monkeys;
-

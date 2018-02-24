@@ -58,16 +58,16 @@
 boolean ST_Responder(event_t* ev);
 
 // Called by main loop.
-void ST_Ticker(void);
+void ST_D_Ticker(void);
 
 // Called by main loop.
-void ST_Drawer(boolean st_statusbaron, boolean refresh, boolean fullmenu);
+void ST_D_Drawer(boolean st_statusbaron, boolean refresh, boolean fullmenu);
 
 // Called when the console player is spawned on each level.
-void ST_Start(void);
+void ST_D_Start(void);
 
 // Called by startup code.
-void ST_Init(void);
+void ST_D_Init(void);
 
 // States for status bar code.
 typedef enum

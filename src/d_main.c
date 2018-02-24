@@ -72,7 +72,7 @@
 #include "g_game.h"
 #include "hu_stuff.h"
 #include "wi_stuff.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "am_map.h"
 #include "p_setup.h"
 #include "r_draw.h"
@@ -82,6 +82,7 @@
 #include "d_deh.h"  // Ty 04/08/98 - Externalizations
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
+#include "d_gameinfo.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -117,6 +118,8 @@ char    wadfile[PATH_MAX+1];       // primary wad file
 char    mapdir[PATH_MAX+1];        // directory of development maps
 char    baseiwad[PATH_MAX+1];      // jff 3/23/98: iwad directory
 char    basesavegame[PATH_MAX+1];  // killough 2/16/98: savegame directory
+
+
 
 //jff 4/19/98 list of standard IWAD names
 const char *const standard_iwads[]=
@@ -261,7 +264,7 @@ void D_Display (void)
       R_RenderPlayerView (&players[displayplayer]);
     if (automapmode & am_active)
       AM_Drawer();
-    ST_Drawer(
+    gamemodeinfo->statusbar->draw(
         ((viewheight != SCREENHEIGHT)
          || ((automapmode & am_active) && !(automapmode & am_overlay))),
         redrawborderstuff,
@@ -381,77 +384,70 @@ static void D_DrawTitle2(const char *name)
   D_SetPageName(name);
 }
 
-/* killough 11/98: tabulate demo sequences
- */
+const demostate_t demostates_doom[] =
+{ // shareware and registered DOOM 1 share same demostates
+  {D_DrawTitle1,      "TITLEPIC"},
+  {G_DeferedPlayDemo, "demo1"},
+  {D_SetPageName,     NULL},
+  {G_DeferedPlayDemo, "demo2"},
+  {D_SetPageName,     "HELP2"},
+  {G_DeferedPlayDemo, "demo3"},
+  {NULL},
+};
 
-static struct
-{
-  void (*func)(const char *);
-  const char *name;
-} const demostates[][4] =
-  {
-    {
-      {D_DrawTitle1, "TITLEPIC"},
-      {D_DrawTitle1, "TITLEPIC"},
-      {D_DrawTitle2, "TITLEPIC"},
-      {D_DrawTitle1, "TITLEPIC"},
-    },
+const demostate_t demostates_doom2[] =
+{ // commercial - DOOM 2 retail, E1 M34  (DOOM 2 german edition not handled)
+  {D_DrawTitle2,      "TITLEPIC"},
+  {G_DeferedPlayDemo, "demo1"},
+  {D_SetPageName,     NULL},
+  {G_DeferedPlayDemo, "demo2"},
+  {D_SetPageName,     "CREDIT"},
+  {G_DeferedPlayDemo, "demo3"},
+  {NULL},
+};
 
-    {
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-    },
-    {
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-    },
+const demostate_t demostates_udoom[] =
+{ // retail - Ultimate DOOM 1 retail, E4, M36
+  {D_DrawTitle1,      "TITLEPIC"},
+  {G_DeferedPlayDemo, "demo1"},
+  {D_SetPageName,     NULL},
+  {G_DeferedPlayDemo, "demo2"},
+  {D_DrawTitle1,      "TITLEPIC"},
+  {G_DeferedPlayDemo, "demo3"},
+  {D_SetPageName,     "CREDIT"},
+  {G_DeferedPlayDemo, "demo4"},
+  {NULL},
+};
 
-    {
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-    },
+const demostate_t demostates_hsw[] =
+{ // heretic shareware
+  {D_DrawTitle1,      "TITLE"},
+  {D_DrawTitle2,      "TITLE"},
+  {G_DeferedPlayDemo, "demo1"},
+  {D_SetPageName,     "ORDER"},
+  {G_DeferedPlayDemo, "demo2"},
+  {D_SetPageName,     NULL   },
+  {G_DeferedPlayDemo, "demo3"},
+  {NULL},
+};
 
-    {
-      {D_SetPageName, "HELP2"},
-      {D_SetPageName, "HELP2"},
-      {D_SetPageName, "CREDIT"},
-      {D_DrawTitle1,  "TITLEPIC"},
-    },
+const demostate_t demostates_hreg[] =
+{ // heretic registered/sosr
+  {D_DrawTitle1,      "TITLE"},
+  {D_DrawTitle2,      "TITLE"},
+  {G_DeferedPlayDemo, "demo1"},
+  {D_SetPageName,     "CREDIT"},
+  {G_DeferedPlayDemo, "demo2"},
+  {D_SetPageName,     NULL   },
+  {G_DeferedPlayDemo, "demo3"},
+  {NULL},
+};
 
-    {
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-    },
-
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {D_SetPageName, "CREDIT"},
-    },
-
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {G_DeferedPlayDemo, "demo4"},
-    },
-
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {NULL},
-    }
-  };
+const demostate_t demostates_indetermined[] =
+{ // indetermined
+  {D_SetPageName, NULL},
+  {NULL}
+};
 
 /*
  * This cycles through the demo sequences.
@@ -474,10 +470,10 @@ void D_DoAdvanceDemo(void)
 #endif
     demosequence = 0;
   } else
-   if (!demostates[++demosequence][gamemode].func)
+   if (!gamemodeinfo->demostates[++demosequence].func)
     demosequence = 0;
-  demostates[demosequence][gamemode].func
-    (demostates[demosequence][gamemode].name);
+  gamemodeinfo->demostates[demosequence].func
+    (gamemodeinfo->demostates[demosequence].name);
 }
 
 //
@@ -547,7 +543,8 @@ static const char *D_dehout(void)
 // jff 4/19/98 Add routine to test IWAD for validity and determine
 // the gamemode from it. Also note if DOOM II, whether secret levels exist
 // CPhipps - const char* for iwadname, made static
-static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
+static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,
+  GameMission_t *gmission, boolean *hassecrets)
 {
   int read_iwad = 0;
   FILE* fp = fopen(iwadname, "rb");
@@ -560,6 +557,8 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
   if ( read_iwad )
   {
     int ud=0,rg=0,sw=0,cm=0,sc=0;
+    int tnt=0,plut=0,raven=0,sosr=0,hacx=0;
+    int freedoom=0;
 
     // Identify IWAD correctly
     if ((fp = fopen(iwadname, "rb")))
@@ -608,7 +607,25 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
                   fileinfo[length].name[4] == '2')
                 ++sc;
           }
-
+          else if(fileinfo[length].name[0] == 'C' &&
+                  fileinfo[length].name[1] == 'A' &&
+                  fileinfo[length].name[2] == 'V' &&
+                  fileinfo[length].name[7] == 0)
+             ++tnt;
+          else if(fileinfo[length].name[0] == 'M' &&
+                  fileinfo[length].name[1] == 'C' &&
+                  fileinfo[length].name[3] == 0)
+             ++plut;
+          else if(!strncmp(fileinfo[length].name, "ADVISOR", 7) ||
+                  !strncmp(fileinfo[length].name, "TINTTAB", 7) ||
+                  !strncmp(fileinfo[length].name, "SNDCURVE", 8))
+             ++raven;
+          else if(!strncmp(fileinfo[length].name, "EXTENDED", 8))
+             ++sosr;
+          else if(!strncmp(fileinfo[length].name, "FREEDOOM", 8))
+             ++freedoom;
+          else if(!strncmp(fileinfo[length].name, "HACX-R", 6))
+             ++hacx;
         free(fileinfo);
       }
       else // missing IWAD tag in header
@@ -619,21 +636,54 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
 
     // Determine game mode from levels present
     // Must be a full set for whichever mode is present
-    // Lack of wolf-3d levels also detected here
+    // Lack of wolf-3d levels (hassecrets) also detected here
 
     *gmode = indetermined;
-    *hassec = FALSE;
-    if (cm>=30)
+    *gmission = none;
+    *hassecrets = FALSE;
+    if(raven == 3)
     {
-      *gmode = commercial;
-      *hassec = sc>=2;
+       // TODO: Hexen
+       *gmission = heretic;
+       if(rg >= 18)
+       {
+          if(sosr && ud >= 9) // require both E4 and EXTENDED lump for SoSR
+             *gmission = hticsosr;
+          *gmode = hereticreg;
+       }
+       else if(sw >= 9)
+          *gmode = hereticsw;
+       else if(sw == 3)
+       {
+          *gmission = hticbeta;
+          *gmode   = hereticsw;
+       }
     }
-    else if (ud>=9)
-      *gmode = retail;
-    else if (rg>=18)
-      *gmode = registered;
-    else if (sw>=9)
-      *gmode = shareware;
+    else
+    {
+      *gmission = doom;
+      if (cm>=30)
+      {
+        *gmode = commercial;
+        *hassecrets = sc>=2 || hacx;
+        if (freedoom)
+          *gmission = doom2;
+        else if(tnt >= 4)
+          *gmission = pack_tnt;
+        else if(plut >= 8)
+          *gmission = pack_plut;
+        else if(hacx)
+          *gmission = pack_hacx;
+        else
+          *gmission = doom2;
+      }
+      else if (ud>=9)
+        *gmode = retail;
+      else if (rg>=18)
+        *gmode = registered;
+      else if (sw>=9)
+        *gmode = shareware;
+    }
   }
   else // error from access call
     return I_Error("CheckIWAD: IWAD %s not readable", iwadname);
@@ -719,6 +769,7 @@ static bool IdentifyVersion (void)
   int         i;    //jff 3/24/98 index of args on commandline
   struct stat sbuf; //jff 3/24/98 used to test save path for existence
   char *iwad       = NULL;
+  GameMode_t gamemode = indetermined;
 
   // set save path to -save parm or current dir
 
@@ -746,39 +797,14 @@ static bool IdentifyVersion (void)
   {
     //jff 9/3/98 use logical output routine
     lprintf(LO_CONFIRM,"IWAD found: %s\n",iwad); //jff 4/20/98 print only if found
-    if (!CheckIWAD(iwad,&gamemode,&haswolflevels))
+    if (!CheckIWAD(iwad,&gamemode,&gamemission,&haswolflevels))
        return false;
 
-    /* jff 8/23/98 set gamemission global appropriately in all cases
-     * cphipps 12/1999 - no version output here, leave that to the caller
-     */
-    switch(gamemode)
-    {
-      case retail:
-      case registered:
-      case shareware:
-        i = strlen(iwad);
-        gamemission = doom;
-        if (i>=10 && (!strnicmp(iwad+i-11,"heretic.wad",11) || !strnicmp(iwad+i-13,"hereticsr.wad",13)))
-          return I_Error("IdentifyVersion: Heretic is not supported");
-        break;
-      case commercial:
-        i = strlen(iwad);
-        gamemission = doom2;
-        if (i>=10 && !strnicmp(iwad+i-10,"doom2f.wad",10))
-          language=french;
-        else if (i>=7 && !strnicmp(iwad+i-7,"tnt.wad",7))
-          gamemission = pack_tnt;
-        else if (i>=12 && !strnicmp(iwad+i-12,"plutonia.wad",12))
-          gamemission = pack_plut;
-        break;
-      default:
-        gamemission = none;
-        break;
-    }
     if (gamemode == indetermined)
       //jff 9/3/98 use logical output routine
       lprintf(LO_WARN,"Unknown Game Version, may not work\n");
+
+    gamemodeinfo = GameModeInfoObjects[gamemode];
     D_AddFile(iwad,source_iwad);
     free(iwad);
   }
@@ -1022,6 +1048,7 @@ static void DoLooseFiles(void)
 /* cph - MBF-like wad/deh/bex autoload code */
 const char *wad_files[MAXLOADFILES], *deh_files[MAXLOADFILES];
 
+
 //
 // D_DoomMainSetup
 //
@@ -1097,11 +1124,7 @@ bool D_DoomMainSetup(void)
       deathmatch = 1;
 
   {
-    // CPhipps - localise title variable
-    // print title for every printed line
-    // cph - code cleaned and made smaller
-    const char* doomverstr;
-
+/*
     switch ( gamemode ) {
     case retail:
       doomverstr = "The Ultimate DOOM";
@@ -1130,13 +1153,13 @@ bool D_DoomMainSetup(void)
       doomverstr = "Public DOOM";
       break;
     }
-
+*/
     /* cphipps - the main display. This shows the build date, copyright, and game type */
     lprintf(LO_ALWAYS,"PrBoom, playing: %s\n"
       "PrBoom is released under the GNU General Public license v2.0.\n"
       "You are welcome to redistribute it under certain conditions.\n"
       "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n",
-      doomverstr);
+      gamemodeinfo->startupBanner);
   }
 
   modifiedgame = FALSE;
@@ -1167,7 +1190,7 @@ bool D_DoomMainSetup(void)
   {
     startmap = 0; // Ty 08/29/98 - allow "-warp x" to go to first map in wad(s)
     autostart = TRUE; // Ty 08/29/98 - move outside the decision tree
-    if (gamemode == commercial)
+    if (gamemodeinfo->id == commercial)
     {
       if (p < myargc-1)
         startmap = atoi(myargv[p+1]);   // Ty 08/29/98 - add test if last parm
@@ -1418,8 +1441,8 @@ bool D_DoomMainSetup(void)
     I_InitGraphics();
 
   //jff 9/3/98 use logical output routine
-  lprintf(LO_INFO,"ST_Init: Init status bar.\n");
-  ST_Init();
+  lprintf(LO_INFO,"Init status bar.\n");
+  gamemodeinfo->statusbar->init();
 
   idmusnum = -1; //jff 3/17/98 insure idmus number is blank
 
@@ -1528,7 +1551,7 @@ void GetFirstMap(int *ep, int *map)
   {
     *ep = 1;
     *map = 1; // default E1M1 or MAP01
-    if (gamemode == commercial)
+    if (gamemodeinfo->id == commercial)
     {
       for (i=1;!done && i<33;i++)  // Ty 09/13/98 - add use of !done
       {

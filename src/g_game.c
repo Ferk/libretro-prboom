@@ -66,7 +66,7 @@
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "am_map.h"
 #include "w_wad.h"
 #include "r_main.h"
@@ -85,6 +85,7 @@
 #include "i_system.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "d_gameinfo.h"
 
 #define SAVEGAMESIZE  0x20000
 #define SAVESTRINGSIZE  24
@@ -406,10 +407,10 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 		  gamekeydown[key_weapon3] ? WP_SHOTGUN :
 		  gamekeydown[key_weapon4] ? WP_CHAINGUN :
 		  gamekeydown[key_weapon5] ? WP_MISSILE :
-		  gamekeydown[key_weapon6] && gamemode != shareware ? WP_PLASMA :
-		  gamekeydown[key_weapon7] && gamemode != shareware ? WP_BFG :
+		  gamekeydown[key_weapon6] && gamemodeinfo->id != shareware ? WP_PLASMA :
+		  gamekeydown[key_weapon7] && gamemodeinfo->id != shareware ? WP_BFG :
 		  gamekeydown[key_weapon8] ? WP_CHAINSAW :
-		  (!demo_compatibility && gamekeydown[key_weapon9] && gamemode == commercial) ? WP_SUPERSHOTGUN :
+		  (!demo_compatibility && gamekeydown[key_weapon9] && gamemodeinfo->id == commercial) ? WP_SUPERSHOTGUN :
 		  WP_NOCHANGE;
 
 	  // killough 3/22/98: For network and demo consistency with the
@@ -444,7 +445,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 		  // in use, or if the SSG is not already in use and the
 		  // player prefers it.
 
-		  if (newweapon == WP_SHOTGUN && gamemode == commercial &&
+		  if (newweapon == WP_SHOTGUN && gamemodeinfo->id == commercial &&
 				  player->weaponowned[WP_SUPERSHOTGUN] &&
 				  (!player->weaponowned[WP_SHOTGUN] ||
 				   player->readyweapon == WP_SHOTGUN ||
@@ -504,13 +505,13 @@ void G_RestartLevel(void)
 
 #include "z_bmalloc.h"
 
-/* 
-============== 
-= 
-= G_DoLoadLevel 
-= 
-============== 
-*/ 
+/*
+==============
+=
+= G_DoLoadLevel
+=
+==============
+*/
 
 static void G_DoLoadLevel (void)
 {
@@ -528,7 +529,7 @@ static void G_DoLoadLevel (void)
    /* DOOM determines the sky texture to be used
     * depending on the current episode, and the game version.
     */
-   if (gamemode == commercial)
+   if (gamemodeinfo->id == commercial)
       // || gamemode == pack_tnt   //jff 3/27/98 sorry guys pack_tnt,pack_plut
       // || gamemode == pack_plut) //aren't gamemodes, this was matching retail
    {
@@ -599,7 +600,7 @@ static void G_DoLoadLevel (void)
    memset (mousebuttons, 0, sizeof(*mousebuttons));
 
    // killough 5/13/98: in case netdemo has consoleplayer other than green
-   ST_Start();
+   gamemodeinfo->statusbar->start();
    HU_Start();
 }
 
@@ -629,7 +630,7 @@ boolean G_Responder (event_t* ev)
         displayplayer = 0;
     while (!playeringame[displayplayer] && displayplayer!=consoleplayer);
 
-    ST_Start();    // killough 3/7/98: switch status bar views too
+    gamemodeinfo->statusbar->start(); // killough 3/7/98: switch status bar views too
     HU_Start();
     S_UpdateSounds(players[displayplayer].mo);
 #ifndef __LIBRETRO__
@@ -892,7 +893,7 @@ void G_Ticker (void)
     {
     case GS_LEVEL:
       P_Ticker ();
-      ST_Ticker ();
+      gamemodeinfo->statusbar->tick();
       AM_Ticker ();
       HU_Ticker ();
       break;
@@ -916,14 +917,14 @@ void G_Ticker (void)
 // also see P_SpawnPlayer in P_Things
 //
 
-/* 
-==================== 
-= 
-= G_PlayerFinishLevel 
-= 
-= Can when a player completes a level 
-==================== 
-*/ 
+/*
+====================
+=
+= G_PlayerFinishLevel
+=
+= Can when a player completes a level
+====================
+*/
 
 static void G_PlayerFinishLevel(int player)
 {
@@ -965,15 +966,15 @@ void G_ChangedPlayerColour(int pn, int cl)
   }
 }
 
-/* 
-==================== 
-= 
-= G_PlayerReborn 
-= 
-= Called after a player dies 
-= almost everything is cleared and initialized 
-==================== 
-*/ 
+/*
+====================
+=
+= G_PlayerReborn
+=
+= Called after a player dies
+= almost everything is cleared and initialized
+====================
+*/
 
 void G_PlayerReborn (int player)
 {
@@ -1015,15 +1016,15 @@ void G_PlayerReborn (int player)
     p->maxammo[i] = maxammo[i];
 }
 
-/* 
-==================== 
-= 
-= G_CheckSpot  
-= 
-= Returns false if the player cannot be respawned at the given mapthing_t spot  
-= because something is occupying it 
-==================== 
-*/ 
+/*
+====================
+=
+= G_CheckSpot
+=
+= Returns false if the player cannot be respawned at the given mapthing_t spot
+= because something is occupying it
+====================
+*/
 
 static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 {
@@ -1126,15 +1127,15 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 }
 
 
-/* 
-==================== 
-= 
-= G_DeathMatchSpawnPlayer 
-= 
-= Spawns a player at one of the random death match spots 
-= called at level load and each death 
-==================== 
-*/ 
+/*
+====================
+=
+= G_DeathMatchSpawnPlayer
+=
+= Spawns a player at one of the random death match spots
+= called at level load and each death
+====================
+*/
 
 void G_DeathMatchSpawnPlayer (int playernum)
 {
@@ -1160,13 +1161,13 @@ void G_DeathMatchSpawnPlayer (int playernum)
    P_SpawnPlayer (playernum, &playerstarts[playernum]);
 }
 
-/* 
-==================== 
-= 
-= G_DoReborn 
-= 
-==================== 
-*/ 
+/*
+====================
+=
+= G_DoReborn
+=
+====================
+*/
 
 void G_DoReborn (int playernum)
 {
@@ -1228,13 +1229,13 @@ int cpars[32] = {
 
 static boolean secretexit;
 
-/* 
-==================== 
-= 
-= G_ExitLevel 
-= 
-==================== 
-*/ 
+/*
+====================
+=
+= G_ExitLevel
+=
+====================
+*/
 
 void G_ExitLevel (void)
 {
@@ -1247,7 +1248,7 @@ void G_ExitLevel (void)
 
 void G_SecretExitLevel (void)
 {
-  if (gamemode!=commercial || haswolflevels)
+  if (gamemodeinfo->id!=commercial || haswolflevels)
     secretexit = TRUE;
   else
     secretexit = FALSE;
@@ -1271,7 +1272,7 @@ void G_DoCompleted (void)
   if (automapmode & am_active)
     AM_Stop();
 
-  if (gamemode != commercial) // kilough 2/7/98
+  if (gamemodeinfo->id != commercial) // kilough 2/7/98
     switch(gamemap)
       {
   // cph - Remove ExM8 special case, so it gets summary screen displayed
@@ -1286,7 +1287,7 @@ void G_DoCompleted (void)
   wminfo.last = gamemap -1;
 
   // wminfo.next is 0 biased, unlike gamemap
-  if (gamemode == commercial)
+  if (gamemodeinfo->id == commercial)
     {
       if (secretexit)
         switch(gamemap)
@@ -1345,7 +1346,7 @@ void G_DoCompleted (void)
   wminfo.maxsecret = totalsecret;
   wminfo.maxfrags = 0;
 
-  if ( gamemode == commercial )
+  if ( gamemodeinfo->id == commercial )
     wminfo.partime = TICRATE*cpars[gamemap-1];
   else
     wminfo.partime = TICRATE*pars[gameepisode][gamemap];
@@ -1387,7 +1388,7 @@ void G_WorldDone (void)
   if (secretexit)
     players[consoleplayer].didsecret = TRUE;
 
-  if (gamemode == commercial)
+  if (gamemodeinfo->id == commercial)
     {
       switch (gamemap)
         {
@@ -1459,12 +1460,12 @@ static uint64_t G_Signature(void)
 
   if (!computed) {
    computed = TRUE;
-   if (gamemode == commercial)
+   if (gamemodeinfo->id == commercial)
     for (map = haswolflevels ? 32 : 30; map; map--)
       sprintf(name, "map%02d", map), s = G_UpdateSignature(s, name);
    else
-    for (episode = gamemode==retail ? 4 :
-     gamemode==shareware ? 1 : 3; episode; episode--)
+    for (episode = gamemodeinfo->id==retail ? 4 :
+     gamemodeinfo->id==shareware ? 1 : 3; episode; episode--)
       for (map = 9; map; map--)
   sprintf(name, "E%dM%d", episode, map), s = G_UpdateSignature(s, name);
   }
@@ -2047,7 +2048,7 @@ void G_DoNewGame (void)
   gameaction = ga_nothing;
 
   //jff 4/26/98 wake up the status bar in case were coming out of a DM demo
-  ST_Start();
+  gamemodeinfo->statusbar->start();
 }
 
 // killough 4/10/98: New function to fix bug which caused Doom
@@ -2100,13 +2101,13 @@ void G_InitNew(skill_t skill, int episode, int map)
   if (episode < 1)
     episode = 1;
 
-  if (gamemode == retail)
+  if (gamemodeinfo->id == retail)
     {
       if (episode > 4)
         episode = 4;
     }
   else
-    if (gamemode == shareware)
+    if (gamemodeinfo->id == shareware)
       {
         if (episode > 1)
           episode = 1; // only start episode 1 on shareware
@@ -2117,7 +2118,7 @@ void G_InitNew(skill_t skill, int episode, int map)
 
   if (map < 1)
     map = 1;
-  if (map > 9 && gamemode != commercial)
+  if (map > 9 && gamemodeinfo->id != commercial)
     map = 9;
 
   G_SetFastParms(fastparm || skill == sk_nightmare);  // killough 4/10/98
@@ -2377,8 +2378,8 @@ static int G_GetOriginalDoomCompatLevel(int ver)
     }
   }
   if (ver < 107) return doom_1666_compatibility;
-  if (gamemode == retail) return ultdoom_compatibility;
-  if (gamemission >= pack_tnt) return finaldoom_compatibility;
+  if (gamemodeinfo->id == retail) return ultdoom_compatibility;
+  if (gamemodeinfo->id >= pack_tnt) return finaldoom_compatibility;
   return doom2_19_compatibility;
 }
 

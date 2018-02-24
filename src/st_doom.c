@@ -38,7 +38,7 @@
 #include "m_random.h"
 #include "i_video.h"
 #include "w_wad.h"
-#include "st_stuff.h"
+#include "st_doom.h"
 #include "st_lib.h"
 #include "r_main.h"
 #include "am_map.h"
@@ -431,7 +431,7 @@ boolean ST_Responder(event_t *ev)
   return FALSE;
 }
 
-static int ST_calcPainOffset(void)
+static int ST_D_calcPainOffset(void)
 {
   static int lastcalc;
   static int oldhealth = -1;
@@ -452,7 +452,7 @@ static int ST_calcPainOffset(void)
 //  dead > evil grin > turned head > straight ahead
 //
 
-static void ST_updateFaceWidget(void)
+static void ST_D_updateFaceWidget(void)
 {
   int         i;
   angle_t     badguyangle;
@@ -492,7 +492,7 @@ static void ST_updateFaceWidget(void)
               // evil grin if just picked up weapon
               priority = 8;
               st_facecount = ST_EVILGRINCOUNT;
-              st_faceindex = ST_calcPainOffset() + ST_EVILGRINOFFSET;
+              st_faceindex = ST_D_calcPainOffset() + ST_EVILGRINOFFSET;
             }
         }
 
@@ -511,7 +511,7 @@ static void ST_updateFaceWidget(void)
           if(st_oldhealth - plyr->health > ST_MUCHPAIN)
             {
               st_facecount = ST_TURNCOUNT;
-              st_faceindex = ST_calcPainOffset() + ST_OUCHOFFSET;
+              st_faceindex = ST_D_calcPainOffset() + ST_OUCHOFFSET;
             }
           else
             {
@@ -535,7 +535,7 @@ static void ST_updateFaceWidget(void)
 
 
               st_facecount = ST_TURNCOUNT;
-              st_faceindex = ST_calcPainOffset();
+              st_faceindex = ST_D_calcPainOffset();
 
               if (diffang < ANG45)
                 {
@@ -568,13 +568,13 @@ static void ST_updateFaceWidget(void)
             {
               priority = 7;
               st_facecount = ST_TURNCOUNT;
-              st_faceindex = ST_calcPainOffset() + ST_OUCHOFFSET;
+              st_faceindex = ST_D_calcPainOffset() + ST_OUCHOFFSET;
             }
           else
             {
               priority = 6;
               st_facecount = ST_TURNCOUNT;
-              st_faceindex = ST_calcPainOffset() + ST_RAMPAGEOFFSET;
+              st_faceindex = ST_D_calcPainOffset() + ST_RAMPAGEOFFSET;
             }
 
         }
@@ -591,7 +591,7 @@ static void ST_updateFaceWidget(void)
           else if (!--lastattackdown)
             {
               priority = 5;
-              st_faceindex = ST_calcPainOffset() + ST_RAMPAGEOFFSET;
+              st_faceindex = ST_D_calcPainOffset() + ST_RAMPAGEOFFSET;
               st_facecount = 1;
               lastattackdown = 1;
             }
@@ -619,7 +619,7 @@ static void ST_updateFaceWidget(void)
   // look left or look right if the facecount has timed out
   if (!st_facecount)
     {
-      st_faceindex = ST_calcPainOffset() + (st_randomnumber % 3);
+      st_faceindex = ST_D_calcPainOffset() + (st_randomnumber % 3);
       st_facecount = ST_STRAIGHTFACECOUNT;
       priority = 0;
     }
@@ -630,7 +630,7 @@ static void ST_updateFaceWidget(void)
 
 int sts_traditional_keys; // killough 2/28/98: traditional status bar keys
 
-static void ST_updateWidgets(void)
+static void ST_D_updateWidgets(void)
 {
   static int  largeammo = 1994; // means "n/a"
   int         i;
@@ -671,7 +671,7 @@ static void ST_updateWidgets(void)
     }
 
   // refresh everything if this is him coming back to life
-  ST_updateFaceWidget();
+  ST_D_updateFaceWidget();
 
   // used by the w_armsbg widget
   st_notdeathmatch = !deathmatch;
@@ -697,17 +697,17 @@ static void ST_updateWidgets(void)
 
 }
 
-void ST_Ticker(void)
+void ST_D_Ticker(void)
 {
   st_clock++;
   st_randomnumber = M_Random();
-  ST_updateWidgets();
+  ST_D_updateWidgets();
   st_oldhealth = plyr->health;
 }
 
 int st_palette = 0;
 
-static void ST_doPaletteStuff(void)
+static void ST_D_doPaletteStuff(void)
 {
   int         palette;
   int cnt = plyr->damagecount;
@@ -755,7 +755,7 @@ static void ST_doPaletteStuff(void)
   }
 }
 
-static void ST_drawWidgets(boolean refresh)
+static void ST_D_drawWidgets(boolean refresh)
 {
   int i, ammolevel;
 
@@ -822,7 +822,7 @@ static void ST_drawWidgets(boolean refresh)
 
 
 
-void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
+void ST_D_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
 {
   /* cph - let status bar on be controlled
    * completely by the call from D_Display
@@ -830,7 +830,7 @@ void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
    */
   st_firsttime = st_firsttime || refresh || fullmenu;
 
-  ST_doPaletteStuff();  // Do red-/gold-shifts from damage/items
+  ST_D_doPaletteStuff();  // Do red-/gold-shifts from damage/items
 
   if (statusbaron) {
     if (st_firsttime)
@@ -839,13 +839,13 @@ void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
       st_firsttime = FALSE;
       ST_refreshBackground(); // draw status bar background to off-screen buff
       if (!fullmenu)
-        ST_drawWidgets(TRUE); // and refresh all widgets
+        ST_D_drawWidgets(TRUE); // and refresh all widgets
     }
     else
     {
       /* Otherwise, update as little as possible */
       if (!fullmenu)
-        ST_drawWidgets(FALSE); // update all widgets
+        ST_D_drawWidgets(FALSE); // update all widgets
     }
   }
 }
@@ -1132,7 +1132,7 @@ static void ST_createWidgets(void)
 
 static boolean st_stopped = TRUE;
 
-void ST_Start(void)
+void ST_D_Start(void)
 {
   if (!st_stopped)
     ST_Stop();
@@ -1157,7 +1157,7 @@ static void ST_Stop(void)
 = Locate and load all needed graphics
 ====================
 */
-void ST_Init(void)
+void ST_D_Init(void)
 {
   veryfirsttime = 0;
   ST_loadData();

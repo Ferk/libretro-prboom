@@ -5,8 +5,10 @@
 #include <unistd.h>
 #endif
 #include <errno.h>
+#include <stdarg.h>
 
 #include "libretro.h"
+
 
 #ifdef _WIN32
    #define DIR_SLASH '\\'
@@ -17,12 +19,12 @@
 /* prboom includes */
 
 #include "../src/d_main.h"
+#include "../src/d_gameinfo.h"
 #include "../src/m_fixed.h"
 #include "../src/m_argv.h"
 #include "../src/i_system.h"
 #include "../src/i_sound.h"
 #include "../src/v_video.h"
-#include "../src/st_stuff.h"
 #include "../src/w_wad.h"
 #include "../src/r_draw.h"
 #include "../src/lprintf.h"
@@ -262,6 +264,27 @@ static void update_variables(bool startup)
       else
          find_recursive_on = false;
    }
+}
+
+/* Use the OSD to notify of something to the user */
+void I_Message(const char *str, ...)
+{
+  char msg[2048];
+  va_list argptr;
+  va_start(argptr,str);
+#ifdef HAVE_VSNPRINTF
+  vsnprintf(msg,sizeof(msg),str,argptr);
+#else
+  vsprintf(msg,str,argptr);
+#endif
+  va_end(argptr);
+  if(environ_cb)
+  {
+    struct retro_message rmsg = { msg, 90 };
+    environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &rmsg);
+  }
+  else
+    lprintf(LO_ERROR, "I_Message: %s\n", msg);
 }
 
 void I_SafeExit(int rc);
@@ -938,7 +961,7 @@ void I_SetRes(void)
    for (i=0; i<3; i++)
       screens[i].height = SCREENHEIGHT;
 
-   screens[4].height = (ST_SCALED_HEIGHT+1);
+   screens[4].height = 1 + (gamemodeinfo->statusbar->height * SCREENHEIGHT/200);
 
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);

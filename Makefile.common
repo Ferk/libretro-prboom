@@ -34,6 +34,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/d_deh.c \
 				 $(CORE_DIR)/d_items.c \
 				 $(CORE_DIR)/d_main.c \
+				 $(CORE_DIR)/d_gameinfo.c \
 				 $(CORE_DIR)/doomstat.c \
 				 $(CORE_DIR)/dstrings.c \
 				 $(CORE_DIR)/f_finale.c \
@@ -79,7 +80,8 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/s_sound.c \
 				 $(CORE_DIR)/sounds.c \
 				 $(CORE_DIR)/st_lib.c \
-				 $(CORE_DIR)/st_stuff.c \
+				 $(CORE_DIR)/st_doom.c \
+				 $(CORE_DIR)/st_htic.c \
 				 $(CORE_DIR)/tables.c \
 				 $(CORE_DIR)/v_video.c \
 				 $(CORE_DIR)/w_wad.c \

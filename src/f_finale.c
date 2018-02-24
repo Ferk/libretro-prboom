@@ -38,7 +38,8 @@
 #include "w_wad.h"
 #include "s_sound.h"
 #include "sounds.h"
-#include "d_deh.h"  // Ty 03/22/98 - externalizations
+#include "d_deh.h"
+#include "d_gameinfo.h"
 #include "f_finale.h" // CPhipps - hmm...
 
 // Stage of animation:
@@ -85,7 +86,7 @@ void F_StartFinale (void)
   /* Okay - IWAD dependent stuff.
    * This has been changed severely, and
    *  some stuff might have changed in the process. */
-  switch ( gamemode )
+  switch ( gamemodeinfo->id )
   {
      /* DOOM 1 - E1, E3 or E4, but each nine missions */
      case shareware:
@@ -221,7 +222,7 @@ void F_Ticker(void)
   if (!demo_compatibility)
     WI_checkForAccelerate();  // killough 3/28/98: check for acceleration
   else
-    if (gamemode == commercial && FinaleCount > 50) // check for skipping
+    if (gamemodeinfo->id == commercial && FinaleCount > 50) // check for skipping
       for (i=0; i<MAXPLAYERS; i++)
         if (players[i].cmd.buttons)
           goto next_level;      // go on to the next level
@@ -239,7 +240,7 @@ void F_Ticker(void)
       if (FinaleCount > strlen(finaletext)*speed +
           (midstage ? NEWTEXTWAIT : TEXTWAIT) ||
           (midstage && acceleratestage)) {
-        if (gamemode != commercial)       // Doom 1 / Ultimate Doom episode end
+        if (gamemodeinfo->id != commercial)       // Doom 1 / Ultimate Doom episode end
           {                               // with enough time, it's automatic
             FinaleCount = 0;
             FinaleStage = 1;
@@ -655,7 +656,7 @@ void F_Drawer (void)
     {
       // CPhipps - patch drawing updated
       case 1:
-           if ( gamemode == retail )
+           if ( gamemodeinfo->id == retail )
              V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
            else
              V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
