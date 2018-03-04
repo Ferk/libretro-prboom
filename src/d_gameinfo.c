@@ -80,6 +80,8 @@ static gamemodeinfo_t giDoomSW =
    CR_RED,           // bigFontItemColor
    0,                // menuOffset
    NULL,//MN_DoomNewGame,   // OnNewGame
+   "STCFN0",        // menufontprefix
+   0,               // menufontoffset
 
    "FLOOR7_2",     // borderFlat
    0,//&giDoomBorder,    // border
@@ -196,6 +198,8 @@ static gamemodeinfo_t giDoomReg =
    CR_RED,           // bigFontItemColor
    0,                // menuOffset
    NULL,//MN_DoomNewGame,   // OnNewGame
+   "STCFN0",        // menufontprefix
+   0,               // menufontoffset
 
    "FLOOR7_2",     // borderFlat
    0,//&giDoomBorder,    // border
@@ -312,6 +316,8 @@ static gamemodeinfo_t giDoomRetail =
    CR_RED,           // bigFontItemColor
    0,                // menuOffset
    NULL,//MN_DoomNewGame,   // OnNewGame
+   "STCFN0",        // menufontprefix
+   0,               // menufontoffset
 
    "FLOOR7_2",     // borderFlat
    0,//&giDoomBorder,    // border
@@ -428,6 +434,8 @@ static gamemodeinfo_t giDoomCommercial =
    CR_RED,           // bigFontItemColor
    0,                // menuOffset
    NULL,//MN_Doom2NewGame,  // OnNewGame
+   "STCFN0",        // menufontprefix
+   0,               // menufontoffset
 
    "GRNROCK",      // borderFlat
    0,//&giDoomBorder,    // border
@@ -545,6 +553,8 @@ static gamemodeinfo_t giHereticSW =
    CR_GREEN,         // bigFontItemColor
    4,                // menuOffset
    NULL,//MN_HticNewGame,   // OnNewGame
+   "FONTB",        // menufontprefix
+   -32,               // menufontoffset
 
    "FLOOR04",      // borderFlat
    0,//&giHticBorder,    // border
@@ -666,6 +676,8 @@ static gamemodeinfo_t giHereticReg =
    CR_GREEN,         // bigFontItemColor
    4,                // menuOffset
    NULL,//MN_HticNewGame,   // OnNewGame
+   "FONTB",        // menufontprefix
+   -32,               // menufontoffset
 
    "FLAT513",     // borderFlat
    0,//&giHticBorder,    // border

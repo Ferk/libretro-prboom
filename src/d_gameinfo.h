@@ -83,6 +83,8 @@ typedef struct
    int bigFontItemColor;          // color of selectable items using big font
    int menuOffset;                // an amount to subtract from menu y coords
    void (*OnNewGame)(void);       // mn_newgame routine
+   char *menufontprefix;          // menu font prefix for the patches
+   int menufontoffset;          // number to start counting for
 
   // border stuff
   const char *borderFlat;        // name of flat to fill backscreen

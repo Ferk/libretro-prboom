@@ -222,6 +222,30 @@ static void ST_HTIC_drawWidgets(boolean refresh)
 
 }
 
+static void ST_refreshBackground(void)
+{
+  int y=0;
+
+  if (st_statusbaron)
+    {
+      // proff 05/17/2000: draw to the frontbuffer in OpenGL
+      V_DrawNumPatch(0, 158, BG, stbarbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
+      //if (plyr.cheats & CF_GODMODE)
+      //{
+      //    V_DrawNamePatch(16, 167,"GOD1", PU_CACHE));
+      //    V_DrawNamePatch(287, 167,"GOD2", PU_CACHE));
+      //}
+      // killough 3/7/98: make face background change with displayplayer
+//      if (netgame)
+//      {
+//        V_DrawNumPatch(ST_FX, y, BG, faceback.lumpnum,
+//           displayplayer ? CR_LIMIT+displayplayer : CR_DEFAULT,
+//           displayplayer ? (VPT_TRANS | VPT_STRETCH) : VPT_STRETCH);
+//      }
+//      V_CopyRect(ST_X, y, BG, ST_SCALED_WIDTH, ST_SCALED_HEIGHT, ST_X, ST_SCALED_Y, FG, VPT_NONE);
+    }
+}
+
 static void ST_Stop(void)
 {
   if (st_stopped)
@@ -303,7 +327,7 @@ void ST_HTIC_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
     {
       /* If just after ST_Start(), refresh all */
       st_firsttime = FALSE;
-      //ST_refreshBackground(); // draw status bar background to off-screen buff
+      ST_refreshBackground(); // draw status bar background to off-screen buff
       if (!fullmenu)
         ST_HTIC_drawWidgets(TRUE); // and refresh all widgets
     }

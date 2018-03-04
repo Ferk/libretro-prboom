@@ -297,6 +297,12 @@ void HU_Init(void)
 
   shiftxform = english_shiftxform;
 
+  char *fontbig = gamemodeinfo->menufontprefix;
+  int fontoffset = gamemodeinfo->menufontoffset;
+
+  fontbig = "STCFN0";
+  fontoffset = 0;
+
   // load the heads-up font
   j = HU_FONTSTART;
   for (i=0;i<HU_FONTSIZE;i++,j++)
@@ -305,44 +311,50 @@ void HU_Init(void)
     {
       sprintf(buffer, "DIG%.1d",j-48);
       R_SetPatchNum(&hu_font2[i], buffer);
-      sprintf(buffer, "STCFN%.3d",j);
+      sprintf(buffer, "%s%.2d",fontbig,fontoffset+j);
       R_SetPatchNum(&hu_font[i], buffer);
     }
     else if ('A'<=j && j<='Z')
     {
       sprintf(buffer, "DIG%c",j);
       R_SetPatchNum(&hu_font2[i], buffer);
-      sprintf(buffer, "STCFN%.3d",j);
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+j);
       R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j=='-')
     {
       R_SetPatchNum(&hu_font2[i], "DIG45");
-      R_SetPatchNum(&hu_font[i], "STCFN045");
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+45);
+      R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j=='/')
     {
       R_SetPatchNum(&hu_font2[i], "DIG47");
-      R_SetPatchNum(&hu_font[i], "STCFN047");
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+47);
+      R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j==':')
     {
       R_SetPatchNum(&hu_font2[i], "DIG58");
-      R_SetPatchNum(&hu_font[i], "STCFN058");
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+58);
+      R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j=='[')
     {
       R_SetPatchNum(&hu_font2[i], "DIG91");
-      R_SetPatchNum(&hu_font[i], "STCFN091");
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+91);
+      R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j==']')
     {
       R_SetPatchNum(&hu_font2[i], "DIG93");
-      R_SetPatchNum(&hu_font[i], "STCFN093");
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+93);
+      R_SetPatchNum(&hu_font[i], buffer);
     }
     else if (j<97)
     {
-      sprintf(buffer, "STCFN%.3d",j);
+      sprintf(buffer, "%s%.2d", fontbig, fontoffset+j);
+      R_SetPatchNum(&hu_font[i], buffer);
       R_SetPatchNum(&hu_font2[i], buffer);
       R_SetPatchNum(&hu_font[i], buffer);
       //jff 2/23/98 make all font chars defined, useful or not
