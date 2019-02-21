@@ -836,7 +836,7 @@ struct default_s *M_LookupDefault(const char *name)
 
 #define NUMCHATSTRINGS 10 // phares 4/13/98
 
-void M_LoadDefaults (void)
+void M_LoadDefaultsFile (char *file, boolean basedefault)
 {
   int   i;
   int   len;
@@ -847,40 +847,8 @@ void M_LoadDefaults (void)
   int   parm;
   boolean isstring;
 
-  // set everything to base values
-
-  numdefaults = sizeof(defaults)/sizeof(defaults[0]);
-  for (i = 0 ; i < numdefaults ; i++) {
-    if (defaults[i].location.ppsz)
-      *defaults[i].location.ppsz = strdup(defaults[i].defaultvalue.psz);
-    if (defaults[i].location.pi)
-      *defaults[i].location.pi = defaults[i].defaultvalue.i;
-  }
-
-  // check for a custom default file
-
-  i = M_CheckParm ("-config");
-  if (i && i < myargc-1)
-    defaultfile = strdup(myargv[i+1]);
-  else {
-    const char* exedir = I_DoomExeDir();
-    defaultfile = malloc(PATH_MAX+1);
-    /* get config file from same directory as executable */
-    snprintf(defaultfile, PATH_MAX,
-            "%s%s%sboom.cfg", exedir,
-#ifdef _WIN32
-            HasTrailingSlash(exedir) ? "" : "\\",
-#else
-            HasTrailingSlash(exedir) ? "" : "/",
-#endif
-            "pr");
-  }
-
-  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
-
   // read the file in, overriding any set defaults
-
-  f = fopen (defaultfile, "r");
+  f = fopen (file, "r");
   if (f)
     {
     while (!feof(f))
@@ -925,7 +893,12 @@ void M_LoadDefaults (void)
 
               if ((defaults[i].minvalue==UL || defaults[i].minvalue<=parm) &&
                   (defaults[i].maxvalue==UL || defaults[i].maxvalue>=parm))
-                *(defaults[i].location.pi) = parm;
+                {
+                  if(basedefault)
+                    defaults[i].defaultvalue.i = parm;
+                  else
+                    *(defaults[i].location.pi) = parm;
+                }
               }
             else
               {
@@ -943,4 +916,43 @@ void M_LoadDefaults (void)
     fclose (f);
     }
   //jff 3/4/98 redundant range checks for hud deleted here
+}
+
+
+void M_LoadDefaults (void)
+{
+  int   i;
+
+  // set everything to base values
+
+  numdefaults = sizeof(defaults)/sizeof(defaults[0]);
+  for (i = 0 ; i < numdefaults ; i++) {
+    if (defaults[i].location.ppsz)
+      *defaults[i].location.ppsz = strdup(defaults[i].defaultvalue.psz);
+    if (defaults[i].location.pi)
+      *defaults[i].location.pi = defaults[i].defaultvalue.i;
+  }
+
+  // check for a custom default file
+
+  i = M_CheckParm ("-config");
+  if (i && i < myargc-1)
+    defaultfile = strdup(myargv[i+1]);
+  else {
+    const char* exedir = I_DoomExeDir();
+    defaultfile = malloc(PATH_MAX+1);
+    /* get config file from same directory as executable */
+    snprintf(defaultfile, PATH_MAX,
+            "%s%s%sboom.cfg", exedir,
+#ifdef _WIN32
+            HasTrailingSlash(exedir) ? "" : "\\",
+#else
+            HasTrailingSlash(exedir) ? "" : "/",
+#endif
+            "pr");
+  }
+
+  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
+
+  M_LoadDefaultsFile(defaultfile, FALSE);
 }
