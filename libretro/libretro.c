@@ -74,6 +74,8 @@ static unsigned doom_devices[1];
 boolean mouse_on;
 /* Whether to search for IWADs on parent folders recursively */
 boolean find_recursive_on;
+/* Whether to load PWAD config */
+boolean pwad_config_on;
 
 // System analog stick range is -0x8000 to 0x8000
 #define ANALOG_RANGE 0x8000
@@ -293,8 +295,9 @@ void retro_set_environment(retro_environment_t cb)
 		{ "prboom-resolution",
 			"Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200|2240x1400|2560x1600" },
 		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
-		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
 		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
+		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
+		{ "prboom-pwad_config_on", "Use PWAD specific config; enabled|disabled" },
 		{ NULL, NULL },
 	};
 
@@ -430,6 +433,16 @@ static void update_variables(bool startup)
          find_recursive_on = false;
    }
 
+   var.key = "prboom-pwad_config_on";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         pwad_config_on = true;
+      else
+         pwad_config_on = false;
+   }
+
    var.key = "prboom-analog_deadzone";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -519,6 +532,58 @@ bool I_PreInitGraphics(void)
    return true;
 }
 
+const char *const known_iwads[]=
+{
+  "doom2f.wad",
+  "doom2.wad",
+  "plutonia.wad",
+  "tnt.wad",
+  "freedoom2.wad",
+  "doom.wad",
+  "doomu.wad", /* CPhipps - alow doomu.wad */
+  "freedoom1.wad",
+  "freedoom.wad",
+  "doom1.wad",
+};
+static const int nknown_iwads = sizeof known_iwads/sizeof*known_iwads;
+
+static char *FindIWADFile(void)
+{
+  int   i, x;
+  char  * iwad  = NULL;
+
+  for (i=0; !iwad && i<nknown_iwads; i++)
+    iwad = I_FindFile(known_iwads[i], NULL);
+
+  return iwad;
+}
+
+void get_save_dir(char* save_dir, char* wadname) {
+  const char *base_save_dir = NULL;
+  bool use_external_savedir = false;
+  // Get save directory
+  if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
+  {
+    if (strlen(base_save_dir) > 0)
+    {
+      // > Build save path
+	   snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, wadname);
+	  use_external_savedir = true;
+
+	  // > Create save directory, if required
+	  if (!path_is_directory(g_save_dir))
+	  {
+	     use_external_savedir = path_mkdir(g_save_dir);
+	  }
+	}
+  }
+  if (!use_external_savedir)
+  {
+    // > Use WAD directory fallback...
+	snprintf(save_dir, sizeof(g_save_dir), "%s", g_wad_dir);
+  }
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    int argc = 0;
@@ -530,10 +595,8 @@ bool retro_load_game(const struct retro_game_info *info)
    if(info->path)
    {
       wadinfo_t header;
-      char *deh;
+      char *deh, *iwad = NULL;
       char name_without_ext[4096];
-      bool use_external_savedir = false;
-      const char *base_save_dir = NULL;
 
       extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
       extract_basename(g_basename, info->path, sizeof(g_basename));
@@ -553,44 +616,42 @@ bool retro_load_game(const struct retro_game_info *info)
       {
          argv[argc++] = strdup("-file");
          argv[argc++] = strdup(info->path);
+
+         iwad = FindIWADFile();
+         if(iwad != NULL)
+         {
+            argv[argc++] = strdup("-iwad");
+            argv[argc++] = strdup(iwad);
+         }
       }
       else
       {
          I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
          goto failed;
       }
-
       /* Check for DEH or BEX files */
       remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
 
+	  /*
       if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
          || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
       {
            argv[argc++] = "-deh";
            argv[argc++] = deh;
       };
+	  */
 
-      // Get save directory
-      if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
-		{
-			if (strlen(base_save_dir) > 0)
-			{
-				// > Build save path
-				snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
-				use_external_savedir = true;
+	  if(iwad)
+	  {
+		 iwad[strlen(iwad) - 3] = '\0';
+		 get_save_dir(g_save_dir, iwad);
+		 M_LoadDefaults();
+	  }
 
-				// > Create save directory, if required
-				if (!path_is_directory(g_save_dir))
-				{
-					use_external_savedir = path_mkdir(g_save_dir);
-				}
-			}
-		}
-      if (!use_external_savedir)
-		{
-			// > Use WAD directory fallback...
-			snprintf(g_save_dir, sizeof(g_save_dir), "%s", g_wad_dir);
-		}
+	  if(!iwad || pwad_config_on)
+	  {
+		 get_save_dir(g_save_dir, name_without_ext);
+	  }
    }
 
    myargc = argc;
