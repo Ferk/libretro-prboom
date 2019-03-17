@@ -7,13 +7,8 @@
 #include <errno.h>
 
 #include "libretro.h"
-#include <file/file_path.h>
 
-#ifdef _WIN32
-   #define DIR_SLASH '\\'
-#else
-   #define DIR_SLASH '/'
-#endif
+#include "libretro_fs.h"
 
 /* prboom includes */
 
@@ -46,9 +41,8 @@ int SCREENHEIGHT = 200;
 static unsigned char *screen_buf;
 
 /* libretro */
-static char g_wad_dir[1024];
-static char g_basename[1024];
-static char g_save_dir[1024];
+//static char g_wad_dir[1024];
+//static char g_basename[1024];
 
 //forward decls
 bool D_DoomMainSetup(void);
@@ -63,7 +57,7 @@ retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 retro_audio_sample_batch_t audio_batch_cb;
-static retro_environment_t environ_cb;
+retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
@@ -185,8 +179,6 @@ static gamepad_layout_t gp_modern = { // Based on Original XBOX Doom 3 Collectio
 	16,
 };
 
-char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
-
 static void check_system_specs(void)
 {
    unsigned level = 4;
@@ -297,7 +289,7 @@ void retro_set_environment(retro_environment_t cb)
 		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
 		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
 		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
-		{ "prboom-pwad_config_on", "Use PWAD specific config; enabled|disabled" },
+		{ "prboom-pwad_config_on", "One config per PWAD; enabled|disabled" },
 		{ NULL, NULL },
 	};
 
@@ -468,121 +460,12 @@ void retro_run(void)
    I_UpdateSound();
 }
 
-static void extract_basename(char *buf, const char *path, size_t size)
-{
-   const char *base = strrchr(path, '/');
-   if (!base)
-      base = strrchr(path, '\\');
-   if (!base)
-      base = path;
-
-   if (*base == '\\' || *base == '/')
-      base++;
-
-   strncpy(buf, base, size - 1);
-   buf[size - 1] = '\0';
-}
-
-static void extract_directory(char *buf, const char *path, size_t size)
-{
-   char *base;
-   strncpy(buf, path, size - 1);
-   buf[size - 1] = '\0';
-
-   base = strrchr(buf, '/');
-   if (!base)
-      base = strrchr(buf, '\\');
-
-   if (base)
-      *base = '\0';
-   else
-   {
-      buf[0] = '.';
-      buf[1] = '\0';
-   }
-}
-
-static void remove_extension(char *buf, const char *path, size_t size)
-{
-  char *base;
-  strncpy(buf, path, size - 1);
-  buf[size - 1] = '\0';
-
-  base = strrchr(buf, '.');
-
-  if (base)
-     *base = '\0';
-}
-
-static wadinfo_t get_wadinfo(const char *path)
-{
-   FILE* fp = fopen(path, "rb");
-   wadinfo_t header;
-   if (fp != NULL)
-   {
-      fread(&header, sizeof(header), 1, fp);
-      fclose(fp);
-   }
-   return header;
-}
-
 bool I_PreInitGraphics(void)
 {
    screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
    return true;
 }
 
-const char *const known_iwads[]=
-{
-  "doom2f.wad",
-  "doom2.wad",
-  "plutonia.wad",
-  "tnt.wad",
-  "freedoom2.wad",
-  "doom.wad",
-  "doomu.wad", /* CPhipps - alow doomu.wad */
-  "freedoom1.wad",
-  "freedoom.wad",
-  "doom1.wad",
-};
-static const int nknown_iwads = sizeof known_iwads/sizeof*known_iwads;
-
-static char *FindIWADFile(void)
-{
-  int   i, x;
-  char  * iwad  = NULL;
-
-  for (i=0; !iwad && i<nknown_iwads; i++)
-    iwad = I_FindFile(known_iwads[i], NULL);
-
-  return iwad;
-}
-
-void get_save_dir(char* save_dir, char* wadname) {
-  const char *base_save_dir = NULL;
-  bool use_external_savedir = false;
-  // Get save directory
-  if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
-  {
-    if (strlen(base_save_dir) > 0)
-    {
-      // > Build save path
-	   snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, wadname);
-	  use_external_savedir = true;
-
-	  // > Create save directory, if required
-	  if (!path_is_directory(g_save_dir))
-	  {
-	     use_external_savedir = path_mkdir(g_save_dir);
-	  }
-	}
-  }
-  if (!use_external_savedir)
-  {
-    // > Use WAD directory fallback...
-	snprintf(save_dir, sizeof(g_save_dir), "%s", g_wad_dir);
-  }
-}
 
 bool retro_load_game(const struct retro_game_info *info)
 {
@@ -591,6 +474,8 @@ bool retro_load_game(const struct retro_game_info *info)
 
    update_variables(true);
 
+   setbuf(stdout, NULL);setbuf(stderr, NULL);
+
    argv[argc++] = strdup("prboom");
    if(info->path)
    {
@@ -598,8 +483,9 @@ bool retro_load_game(const struct retro_game_info *info)
       char *deh, *iwad = NULL;
       char name_without_ext[4096];
 
-      extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
-      extract_basename(g_basename, info->path, sizeof(g_basename));
+      ExtractFileDirectory(g_wad_dir, info->path, sizeof(g_wad_dir));
+      ExtractFileBasename(g_basename, info->path, sizeof(g_basename));
+      RemoveFileExtension(name_without_ext, g_basename, sizeof(name_without_ext));
 
       header = get_wadinfo(info->path);
       if(header.identification == NULL)
@@ -614,15 +500,18 @@ bool retro_load_game(const struct retro_game_info *info)
       }
       else if(!strncmp(header.identification, "PWAD", 4))
       {
-         argv[argc++] = strdup("-file");
-         argv[argc++] = strdup(info->path);
+			  iwad = FindIWADFile();
+				if(iwad != NULL)
+				{
+					 argv[argc++] = strdup("-iwad");
+					 argv[argc++] = strdup(iwad);
 
-         iwad = FindIWADFile();
-         if(iwad != NULL)
-         {
-            argv[argc++] = strdup("-iwad");
-            argv[argc++] = strdup(iwad);
-         }
+					 // Load configuration from iwad first
+					 init_save_dir(g_save_dir, name_without_ext);
+				}
+
+        argv[argc++] = strdup("-file");
+        argv[argc++] = strdup(info->path);
       }
       else
       {
@@ -630,32 +519,23 @@ bool retro_load_game(const struct retro_game_info *info)
          goto failed;
       }
       /* Check for DEH or BEX files */
-      remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
-
-	  /*
       if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
          || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
       {
            argv[argc++] = "-deh";
            argv[argc++] = deh;
       };
-	  */
 
-	  if(iwad)
-	  {
-		 iwad[strlen(iwad) - 3] = '\0';
-		 get_save_dir(g_save_dir, iwad);
-		 M_LoadDefaults();
-	  }
-
-	  if(!iwad || pwad_config_on)
-	  {
-		 get_save_dir(g_save_dir, name_without_ext);
-	  }
+      init_save_dir(g_save_dir, name_without_ext);
+      //init_config_file(g_save_dir, name_without_ext, iwad);
    }
+
 
    myargc = argc;
    myargv = (const char **) argv;
+
+	 for (int i=1;i<myargc;i++)
+	    lprintf(LO_ALWAYS, "myargv[%d]: %s\n", i, myargv[i]);
 
    if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
       goto failed;
@@ -686,6 +566,7 @@ failed:
    I_SafeExit(-1);
    return false;
 }
+
 
 
 void retro_unload_game(void)
@@ -1261,99 +1142,6 @@ const char* I_SigString(char* buf, size_t sz, int signum)
    return buf;
 }
 
-#else
-
-const char *I_DoomExeDir(void)
-{
-   return g_save_dir;
-}
-
-/*
-* HasTrailingSlash
-*
-* cphipps - simple test for trailing slash on dir names
-*/
-boolean HasTrailingSlash(const char* dn)
-{
-   return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
-}
-
-/**
- * FindFileInDir
- **
- * Checks if directory contains a file with given name and extension.
- * returns the path to the file if it exists and is readable or NULL otherwise
- */
-char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
-{
-   FILE * file;
-   char * p;
-   /* Precalculate a length we will need in the loop */
-   size_t pl = strlen(wfname) + (ext && strlen(ext)) + 4;
-
-   if( dir == NULL ) {
-      p = malloc(pl);
-      sprintf(p, "%s", wfname);
-   }
-   else {
-     p = malloc(strlen(dir) + pl);
-     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
-   }
-
-   if (ext && ext[0] != '\0')
-   {
-      strcat(p, ext);
-   }
-   file = fopen(p, "rb");
-
-   if (file)
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "FindFileInDir: found %s\n", p);
-      fclose(file);
-      return p;
-   }
-   else if (log_cb)
-      log_cb(RETRO_LOG_INFO, "FindFileInDir: not found %s in %s\n", wfname, dir);
-
-   free(p);
-   return NULL;
-}
-
-/*
- * I_FindFile
- **
- * Given a file name, search for it in g_wad_dir first, then the system folder
- * and then scan the parent folders of g_wad_dir.
- */
-char* I_FindFile(const char* wfname, const char* ext)
-{
-   char *p, *dir, *system_dir;
-   int i;
-   if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)
-   {
-     environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
-     if ((!system_dir || (p = FindFileInDir(system_dir, wfname, ext)) == NULL)
-        && find_recursive_on)
-     { // Find recursively on parent directories
-       dir = malloc(strlen(g_wad_dir));
-       strcpy(dir, g_wad_dir);
-       for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
-       {
-         if((dir[i] == '/' || dir[i] == '\\')
-           && dir[i-1] != dir[i])
-         {
-           dir[i] = '\0'; // remove leading slash
-           p = FindFileInDir(dir, wfname, ext);
-           if(p != NULL) break;
-         }
-       }
-       free(dir);
-     }
-   }
-   return p;
-}
-
 #endif
 
 
@@ -1369,34 +1157,6 @@ void I_Init(void)
       doom_devices[i] = RETRO_DEVICE_JOYPAD;
 
    R_InitInterpolation();
-}
-
-/*
-* I_Filelength
-*
-* Return length of an open file.
-*/
-
-int I_Filelength(int handle)
-{
-   struct stat   fileinfo;
-   if (fstat(handle,&fileinfo) == -1)
-      I_Error("I_Filelength: %s",strerror(errno));
-   return fileinfo.st_size;
-}
-
-void I_Read(int fd, void* vbuf, size_t sz)
-{
-   unsigned char* buf = vbuf;
-
-   while (sz)
-   {
-      int rc = read(fd,buf,sz);
-      if (rc <= 0)
-         I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
-      sz  -= rc;
-      buf += rc;
-   }
 }
 
 void R_InitInterpolation(void)

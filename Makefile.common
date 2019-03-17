@@ -18,6 +18,7 @@ endif
 
 SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_DIR)/libretro_sound.c \
+				 $(LIBRETRO_DIR)/libretro_fs.c \
 				 $(LIBRETRO_COMM_DIR)/compat/compat_strcasestr.c \
 				 $(LIBRETRO_COMM_DIR)/encodings/encoding_utf.c \
 				 $(LIBRETRO_COMM_DIR)/compat/compat_snprintf.c \

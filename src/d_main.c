@@ -118,22 +118,6 @@ char    mapdir[PATH_MAX+1];        // directory of development maps
 char    baseiwad[PATH_MAX+1];      // jff 3/23/98: iwad directory
 char    basesavegame[PATH_MAX+1];  // killough 2/16/98: savegame directory
 
-//jff 4/19/98 list of standard IWAD names
-const char *const standard_iwads[]=
-{
-  "doom2f.wad",
-  "doom2.wad",
-  "plutonia.wad",
-  "tnt.wad",
-  "freedoom2.wad",
-  "doom.wad",
-  "doomu.wad", /* CPhipps - alow doomu.wad */
-  "freedoom1.wad",
-  "freedoom.wad",
-  "doom1.wad",
-};
-static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;
-
 /*
  * D_PostEvent - Event handling
  *
@@ -666,33 +650,6 @@ static void NormalizeSlashes(char *str)
       str[l]='/';
 }
 
-/*
- * FindIWADFIle
- *
- * Search for one of the standard IWADs
- * CPhipps  - static, proper prototype
- *    - 12/1999 - rewritten to use I_FindFile
- */
-static char *FindIWADFile(void)
-{
-  int   i, x;
-  char  * iwad  = NULL;
-
-  i = M_CheckParm("-iwad");
-  lprintf(LO_ALWAYS, "i: %d\n", i);
-
-  for(x = 0; x < 32; x++)
-     lprintf(LO_ALWAYS, "myargv[%d]: %s\n", x, myargv[x]);
-
-  if (i && (++i < myargc)) {
-    iwad = I_FindFile(myargv[i], NULL);
-  } else {
-    for (i=0; !iwad && i<nstandard_iwads; i++)
-      iwad = I_FindFile(standard_iwads[i], NULL);
-  }
-  return iwad;
-}
-
 //
 // IdentifyVersion
 //
@@ -738,9 +695,8 @@ static bool IdentifyVersion (void)
 #endif
 
   // locate the IWAD and determine game mode from it
-
-  iwad = FindIWADFile();
-  lprintf(LO_ALWAYS, "iwad: %s\n", iwad);
+  if ((i=M_CheckParm("-iwad")) && i && (++i < myargc))
+    iwad = myargv[i];
 
   if (iwad && *iwad)
   {
@@ -748,6 +704,7 @@ static bool IdentifyVersion (void)
     lprintf(LO_CONFIRM,"IWAD found: %s\n",iwad); //jff 4/20/98 print only if found
     if (!CheckIWAD(iwad,&gamemode,&haswolflevels))
        return false;
+
 
     /* jff 8/23/98 set gamemission global appropriately in all cases
      * cphipps 12/1999 - no version output here, leave that to the caller
@@ -780,7 +737,6 @@ static bool IdentifyVersion (void)
       //jff 9/3/98 use logical output routine
       lprintf(LO_WARN,"Unknown Game Version, may not work\n");
     D_AddFile(iwad,source_iwad);
-    free(iwad);
   }
   else
     return I_Error("IdentifyVersion: IWAD not found\n");
@@ -1077,7 +1033,6 @@ bool D_DoomMainSetup(void)
     }
 
     D_AddFile(data_wad_path, source_pre);
-    free(data_wad_path);
   }
 
   // e6y: DEH files preloaded in wrong order
