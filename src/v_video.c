@@ -289,7 +289,7 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    if (drawvars.filterpatch == RDRAW_FILTER_LINEAR)
    {
       // bias the texture u coordinate
-      if (patch->isNotTileable)
+      if (patch->flags&PATCH_ISNOTTILEABLE)
          col = -(FRACUNIT>>1);
       else
          col = (patch->width<<FRACBITS)-(FRACUNIT>>1);

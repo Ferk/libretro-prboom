@@ -42,6 +42,12 @@ typedef enum {
   RDRAW_EDGESLOPE_BOT_MASK = 0xc,  
 } edgeslope_t;
 
+typedef enum {
+  PATCH_ISNOTTILEABLE   = 0x00000001,
+  PATCH_REPEAT          = 0x00000002,
+  PATCH_HASHOLES        = 0x00000004,
+} rpatch_flag_t;
+
 typedef struct {
   int topdelta;
   int length;
@@ -58,9 +64,7 @@ typedef struct {
   int width;
   int height;
   unsigned  widthmask;
-    
-  unsigned char isNotTileable;
-  
+
   int leftoffset;
   int topoffset;
   
@@ -74,6 +78,7 @@ typedef struct {
   rpost_t *posts;
 
   unsigned int locks;
+  unsigned int flags;
 } rpatch_t;
 
 

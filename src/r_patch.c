@@ -75,6 +75,9 @@ static rpatch_t *patches = 0;
 
 static rpatch_t *texture_composites = 0;
 
+// indices of two duplicate PLAYPAL entries, second is -1 if none found
+static int playpal_transparent, playpal_duplicate;
+
 //---------------------------------------------------------------------------
 void R_InitPatches(void) {
   if (!patches)
@@ -88,6 +91,43 @@ void R_InitPatches(void) {
     texture_composites = (rpatch_t*)malloc(numtextures * sizeof(rpatch_t));
     // clear out new patches to signal they're uninitialized
     memset(texture_composites, 0, sizeof(rpatch_t)*numtextures);
+  }
+
+  if (!playpal_duplicate)
+  {
+    int lump = W_GetNumForName("PLAYPAL");
+    const uint8_t *playpal = W_CacheLumpNum(lump);
+
+    // find two duplicate palette entries. use one for transparency.
+    // rewrite source pixels in patches to the other on composition.
+
+    int i, j, found = 0;
+
+    for (i = 0; i < 256; i++)
+    {
+      for (j = i+1; j < 256; j++)
+      {
+        if (playpal[3*i+0] == playpal[3*j+0] &&
+            playpal[3*i+1] == playpal[3*j+1] &&
+            playpal[3*i+2] == playpal[3*j+2])
+        {
+          found = 1;
+          break;
+        }
+      }
+      if (found)
+        break;
+    }
+
+    if (found) { // found duplicate
+      playpal_transparent = i;
+      playpal_duplicate   = j;
+    } else { // no duplicate: use 255 for transparency, as done previously
+      playpal_transparent = 255;
+      playpal_duplicate   = -1;
+    }
+
+    W_UnlockLumpNum(lump);
   }
 }
 
@@ -184,11 +224,163 @@ static int getColumnEdgeSlope(const column_t *prevcolumn, const column_t *nextco
   return 0;
 }
 
+
+//---------------------------------------------------------------------------
+// Fill borders of transparent pixels that may appear due to rounding errors
+// under some aspect ratios or configurations.
+//---------------------------------------------------------------------------
+static void FillEmptySpace(rpatch_t *patch)
+{
+  int x, y, w, h, numpix, pass, transparent, has_holes;
+  uint8_t *orig, *copy, *src, *dest, *prev, *next;
+
+  // loop over patch looking for transparent pixels next to solid ones
+  // copy solid pixels into the spaces, dilating the patch outwards
+  // repeat either a fixed number of times or until all space is filled
+  // this eliminates artifacts surrounding weapon sprites (e.g. chainsaw)
+
+  w = patch->width;
+  h = patch->height;
+  numpix = w * h;
+
+  // alternate between two buffers to avoid "overlapping memcpy"-like symptoms
+  orig = patch->pixels;
+  copy = malloc(numpix);
+
+  for (pass = 0; pass < 8; pass++) // arbitrarily chosen limit (must be even)
+  {
+    // copy src to dest, then switch them on next pass
+    // (this requires an even number of passes)
+    src  = ((pass & 1) == 0) ? orig : copy;
+    dest = ((pass & 1) == 0) ? copy : orig;
+
+    // previous and next columns adjacent to current column x
+    // these pointers must not be dereferenced without appropriate checks
+    prev = src - h; // only valid when x > 0
+    next = src + h; // only valid when x < w-1
+
+    has_holes = 0; // if the patch has any holes at all
+    transparent = 0; // number of pixels this pass did not handle
+
+    // detect transparent pixels on edges, copy solid colour into the space
+    // the order of directions (up,down,left,right) is arbitrarily chosen
+    for (x = 0; x < w; x++)
+    {
+      for (y = 0; y < h; y++)
+      {
+        if (*src == playpal_transparent) has_holes = 1;
+
+        if (*src != playpal_transparent)
+          *dest = *src; // already a solid pixel, just copy it over
+        else if (y > 0 && *(src-1) != playpal_transparent)
+          *dest = *(src - 1); // solid pixel above
+        else if (y < h-1 && *(src+1) != playpal_transparent)
+          *dest = *(src + 1); // solid pixel below
+        else if (x > 0 && *prev != playpal_transparent)
+          *dest = *prev; // solid pixel to left
+        else if (x < w-1 && *next != playpal_transparent)
+          *dest = *next; // solid pixel to right
+        else // transparent pixel with no adjacent solid pixels
+          *dest = *src, transparent++; // count unhandled pixels
+
+        prev++, src++, next++, dest++;
+      }
+    }
+
+    if (transparent == 0) // no more transparent pixels to fill
+    {
+      if ((pass & 1) == 0) // dest was copy, src was orig: orig needs update
+        memcpy(orig, copy, numpix);
+      break;
+    }
+    else if (transparent == numpix)
+      break; // avoid infinite loop on entirely transparent patches (STBR127)
+  }
+
+  free(copy);
+
+  // copy top row of patch into any space at bottom, and vice versa
+  // a hack to fix erroneous row of pixels at top of firing chaingun
+
+  for (x = 0, src = orig, dest = src + h-1; x < w; x++, src += h, dest += h)
+  {
+    if (*src != playpal_transparent && *dest == playpal_transparent)
+      *dest = *src; // bottom transparent, top solid
+    else if (*src == playpal_transparent && *dest != playpal_transparent)
+      *src = *dest; // top transparent, bottom solid
+  }
+
+  if (has_holes)
+    patch->flags |= PATCH_HASHOLES;
+}
+
+
+//---------------------------------------------------------------------------
+// Checks if the lump can be a valid Doom patch we can load
+// (use this to avoid segfaults with unknown formats)
+//---------------------------------------------------------------------------
+static boolean CheckIfPatch(int lump)
+{
+  int size;
+  int width, height;
+  const patch_t * patch;
+  boolean result;
+
+  size = W_LumpLength(lump);
+
+  // minimum length of a valid Doom patch
+  if (size < 13)
+    return false;
+
+  patch = (const patch_t *)W_CacheLumpNum(lump);
+
+  width = SHORT(patch->width);
+  height = SHORT(patch->height);
+
+  result = (height > 0 && height <= 16384 && width > 0 && width <= 16384 && width < size / 4);
+
+  if (result)
+  {
+    // The dimensions seem like they might be valid for a patch, so
+    // check the column directory for extra security. All columns
+    // must begin after the column directory, and none of them must
+    // point past the end of the patch.
+    int x;
+
+    for (x = 0; x < width; x++)
+    {
+      unsigned int ofs = LONG(patch->columnofs[x]);
+
+      // Need one byte for an empty column (but there's patches that don't know that!)
+      if (ofs < (unsigned int)width * 4 + 8 || ofs >= (unsigned int)size)
+      {
+        result = false;
+        break;
+      }
+    }
+  }
+
+  W_UnlockLumpNum(lump);
+  return result;
+}
+
+//---------------------------------------------------------------------------
+// helper function to write a pixel into the patch buffer,
+// substituting the transparent index for its duplicate, if possible.
+//---------------------------------------------------------------------------
+static void StorePixel(rpatch_t *patch, int x, int y, uint8_t color)
+{
+  // write pixel to patch, substituting for playpal_transparent as needed
+  if (color == playpal_transparent && playpal_duplicate >= 0)
+    color = playpal_duplicate;
+  patch->pixels[x * patch->height + y] = color;
+}
+
 //---------------------------------------------------------------------------
 static void createPatch(int id) {
   rpatch_t *patch;
   const int patchNum = id;
-  const patch_t *oldPatch = (const patch_t*)W_CacheLumpNum(patchNum);
+  const patch_t *oldPatch;
   const column_t *oldColumn, *oldPrevColumn, *oldNextColumn;
   int x, y;
   int pixelDataSize;
@@ -201,6 +393,14 @@ static void createPatch(int id) {
   int numPostsUsedSoFar;
   int edgeSlope;
 
+  if (!CheckIfPatch(patchNum))
+  {
+    I_Error("createPatch: Unknown patch format %s.",
+      (patchNum < numlumps ? lumpinfo[patchNum].name : NULL));
+  }
+
+  oldPatch = (const patch_t*)W_CacheLumpNum(patchNum);
+
   patch = &patches[id];
   // proff - 2003-02-16 What about endianess?
   patch->width = SHORT(oldPatch->width);
@@ -208,7 +408,9 @@ static void createPatch(int id) {
   patch->height = SHORT(oldPatch->height);
   patch->leftoffset = SHORT(oldPatch->leftoffset);
   patch->topoffset = SHORT(oldPatch->topoffset);
-  patch->isNotTileable = getPatchIsNotTileable(oldPatch);
+  patch->flags = 0;
+  if (getPatchIsNotTileable(oldPatch))
+    patch->flags |= PATCH_ISNOTTILEABLE;
 
   // work out how much memory we need to allocate for this patch's data
   pixelDataSize = (patch->width * patch->height + 4) & ~3;
@@ -243,7 +445,8 @@ static void createPatch(int id) {
   // sanity check that we've got all the memory allocated we need
   assert((((uint8_t*)patch->posts  + numPostsTotal*sizeof(rpost_t)) - (uint8_t*)patch->data) == dataSize);
 
-  memset(patch->pixels, 0xff, (patch->width*patch->height));
+  if (playpal_transparent != 0)
+    memset(patch->pixels, playpal_transparent, (patch->width*patch->height));
 
   // fill in the pixels, posts, and columns
   numPostsUsedSoFar = 0;
@@ -252,7 +455,7 @@ static void createPatch(int id) {
 
     oldColumn = (const column_t *)((const uint8_t *)oldPatch + LONG(oldPatch->columnofs[x]));
 
-    if (patch->isNotTileable) {
+    if (patch->flags&PATCH_ISNOTTILEABLE) {
       // non-tiling
       if (x == 0) oldPrevColumn = 0;
       else oldPrevColumn = (const column_t *)((const uint8_t *)oldPatch + LONG(oldPatch->columnofs[x-1]));
@@ -275,6 +478,7 @@ static void createPatch(int id) {
     patch->columns[x].posts = patch->posts + numPostsUsedSoFar;
 
     while (oldColumn->topdelta != 0xff) {
+      int len = oldColumn->length;
 
       //e6y: support for DeePsea's true tall patches
       if (oldColumn->topdelta <= top)
@@ -286,73 +490,39 @@ static void createPatch(int id) {
         top = oldColumn->topdelta;
       }
 
-      // set up the post's data
-      patch->posts[numPostsUsedSoFar].topdelta = top;
-      patch->posts[numPostsUsedSoFar].length = oldColumn->length;
-      patch->posts[numPostsUsedSoFar].slope = 0;
-
-      edgeSlope = getColumnEdgeSlope(oldPrevColumn, oldNextColumn, top);
-      if (edgeSlope == 1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_TOP_UP;
-      else if (edgeSlope == -1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_TOP_DOWN;
-
-      edgeSlope = getColumnEdgeSlope(oldPrevColumn, oldNextColumn, top+oldColumn->length);
-      if (edgeSlope == 1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_BOT_UP;
-      else if (edgeSlope == -1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_BOT_DOWN;
-
-      // fill in the post's pixels
-      oldColumnPixelData = (const uint8_t *)oldColumn + 3;
-      for (y=0; y<oldColumn->length; y++) {
-        patch->pixels[x * patch->height + top + y] = oldColumnPixelData[y];
+      // Clip posts that extend past the bottom
+      if (top + oldColumn->length > patch->height)
+      {
+        len = patch->height - top;
       }
 
+      if (len > 0)
+      {
+        // set up the post's data
+        patch->posts[numPostsUsedSoFar].topdelta = top;
+        patch->posts[numPostsUsedSoFar].length = len;
+        patch->posts[numPostsUsedSoFar].slope = 0;
+
+        edgeSlope = getColumnEdgeSlope(oldPrevColumn, oldNextColumn, top);
+        if (edgeSlope == 1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_TOP_UP;
+        else if (edgeSlope == -1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_TOP_DOWN;
+
+        edgeSlope = getColumnEdgeSlope(oldPrevColumn, oldNextColumn, top+len);
+        if (edgeSlope == 1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_BOT_UP;
+        else if (edgeSlope == -1) patch->posts[numPostsUsedSoFar].slope |= RDRAW_EDGESLOPE_BOT_DOWN;
+
+        // fill in the post's pixels
+        oldColumnPixelData = (const uint8_t *)oldColumn + 3;
+        for (y=0; y<len; y++) {
+          StorePixel(patch, x, top + y, oldColumnPixelData[y]);
+        }
+      }
       oldColumn = (const column_t *)((const uint8_t *)oldColumn + oldColumn->length + 4);
       numPostsUsedSoFar++;
     }
   }
 
-  if (1 || patch->isNotTileable) {
-    const rcolumn_t *column, *prevColumn;
-
-    // copy the patch image down and to the right where there are
-    // holes to eliminate the black halo from bilinear filtering
-    for (x=0; x<patch->width; x++) {
-      //oldColumn = (const column_t *)((const uint8_t *)oldPatch + oldPatch->columnofs[x]);
-
-      column = R_GetPatchColumnClamped(patch, x);
-      prevColumn = R_GetPatchColumnClamped(patch, x-1);
-
-      if (column->pixels[0] == 0xff) {
-        // force the first pixel (which is a hole), to use
-        // the color from the next solid spot in the column
-        for (y=0; y<patch->height; y++) {
-          if (column->pixels[y] != 0xff) {
-            column->pixels[0] = column->pixels[y];
-            break;
-          }
-        }
-      }
-
-      // copy from above or to the left
-      for (y=1; y<patch->height; y++) {
-        //if (getIsSolidAtSpot(oldColumn, y)) continue;
-        if (column->pixels[y] != 0xff) continue;
-
-        // this pixel is a hole
-
-        if (x && prevColumn->pixels[y-1] != 0xff) {
-          // copy the color from the left
-          column->pixels[y] = prevColumn->pixels[y];
-        }
-        else {
-          // copy the color from above
-          column->pixels[y] = column->pixels[y-1];
-        }
-      }
-    }
-
-    // verify that the patch truly is non-rectangular since
-    // this determines tiling later on
-  }
+  FillEmptySpace(patch);
 
   W_UnlockLumpNum(patchNum);
   free(numPostsInColumn);
@@ -411,7 +581,6 @@ static void createTextureCompositePatch(int id) {
   int edgeSlope;
   count_t *countsInColumn;
 
-
   composite_patch = &texture_composites[id];
 
   texture = textures[id];
@@ -421,7 +590,7 @@ static void createTextureCompositePatch(int id) {
   composite_patch->widthmask = texture->widthmask;
   composite_patch->leftoffset = 0;
   composite_patch->topoffset = 0;
-  composite_patch->isNotTileable = 0;
+  composite_patch->flags = 0;
 
   // work out how much memory we need to allocate for this patch's data
   pixelDataSize = (composite_patch->width * composite_patch->height + 4) & ~3;
@@ -472,7 +641,8 @@ static void createTextureCompositePatch(int id) {
   // sanity check that we've got all the memory allocated we need
   assert((((uint8_t*)composite_patch->posts + numPostsTotal*sizeof(rpost_t)) - (uint8_t*)composite_patch->data) == dataSize);
 
-  memset(composite_patch->pixels, 0xff, (composite_patch->width*composite_patch->height));
+  if (playpal_transparent != 0)
+    memset(composite_patch->pixels, playpal_transparent, (composite_patch->width*composite_patch->height));
 
   numPostsUsedSoFar = 0;
 
@@ -540,13 +710,12 @@ static void createTextureCompositePatch(int id) {
                 continue;
               if (ty >= composite_patch->height)
                 break;
-              composite_patch->pixels[tx * composite_patch->height + ty] = oldColumnPixelData[y];
+              StorePixel(composite_patch, tx, ty, oldColumnPixelData[y]);
             }
           }
           // do the buggy clipping
           if ((oy + top) < 0) {
             count += oy;
-            oy = 0;
           }
         } else {
           // with a single patch only negative y origins are wrong
@@ -585,7 +754,7 @@ static void createTextureCompositePatch(int id) {
             continue;
           if (ty >= composite_patch->height)
             break;
-          composite_patch->pixels[tx * composite_patch->height + ty] = oldColumnPixelData[y];
+          StorePixel(composite_patch, tx, ty, oldColumnPixelData[y]);
         }
 
         oldColumn = (const column_t *)((const uint8_t *)oldColumn + oldColumn->length + 4);
@@ -629,49 +798,7 @@ static void createTextureCompositePatch(int id) {
     }
   }
 
-  if (1 || composite_patch->isNotTileable) {
-    const rcolumn_t *column, *prevColumn;
-
-    // copy the patch image down and to the right where there are
-    // holes to eliminate the black halo from bilinear filtering
-    for (x=0; x<composite_patch->width; x++) {
-      //oldColumn = (const column_t *)((const uint8_t *)oldPatch + oldPatch->columnofs[x]);
-
-      column = R_GetPatchColumnClamped(composite_patch, x);
-      prevColumn = R_GetPatchColumnClamped(composite_patch, x-1);
-
-      if (column->pixels[0] == 0xff) {
-        // force the first pixel (which is a hole), to use
-        // the color from the next solid spot in the column
-        for (y=0; y<composite_patch->height; y++) {
-          if (column->pixels[y] != 0xff) {
-            column->pixels[0] = column->pixels[y];
-            break;
-          }
-        }
-      }
-
-      // copy from above or to the left
-      for (y=1; y<composite_patch->height; y++) {
-        //if (getIsSolidAtSpot(oldColumn, y)) continue;
-        if (column->pixels[y] != 0xff) continue;
-
-        // this pixel is a hole
-
-        if (x && prevColumn->pixels[y-1] != 0xff) {
-          // copy the color from the left
-          column->pixels[y] = prevColumn->pixels[y];
-        }
-        else {
-          // copy the color from above
-          column->pixels[y] = column->pixels[y-1];
-        }
-      }
-    }
-
-    // verify that the patch truly is non-rectangular since
-    // this determines tiling later on
-  }
+  FillEmptySpace(composite_patch);
 
   free(countsInColumn);
 }
@@ -730,7 +857,6 @@ const rpatch_t *R_CacheTextureCompositePatchNum(int id) {
   texture_composites[id].locks += locks;
 
   return &texture_composites[id];
-
 }
 
 void R_UnlockTextureCompositePatchNum(int id)
@@ -760,6 +886,6 @@ const rcolumn_t *R_GetPatchColumnClamped(const rpatch_t *patch, int columnIndex)
 
 //---------------------------------------------------------------------------
 const rcolumn_t *R_GetPatchColumn(const rpatch_t *patch, int columnIndex) {
-  if (patch->isNotTileable) return R_GetPatchColumnClamped(patch, columnIndex);
+  if (patch->flags&PATCH_ISNOTTILEABLE) return R_GetPatchColumnClamped(patch, columnIndex);
   else return R_GetPatchColumnWrapped(patch, columnIndex);
 }
