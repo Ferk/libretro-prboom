@@ -70,12 +70,13 @@ int      centerx, centery;
 fixed_t  centerxfrac, centeryfrac;
 fixed_t  viewheightfrac; //e6y: for correct clipping of things
 fixed_t  projection;
-// proff 11/06/98: Added for high-res
-fixed_t  projectiony;
+fixed_t  projectiony; // proff 11/06/98: Added for high-res
 fixed_t  viewx, viewy, viewz;
 angle_t  viewangle;
 fixed_t  viewcos, viewsin;
 player_t *viewplayer;
+float viewfocratio; //e6y: for more precise flat drawing
+
 extern lighttable_t **walllights;
 
 #ifndef __LIBRETRO__
@@ -436,9 +437,10 @@ void R_ExecuteSetViewSize (void)
   centerxfrac = centerx<<FRACBITS;
   centeryfrac = centery<<FRACBITS;
   projection = centerxfrac;
-// proff 11/06/98: Added for high-res
+  // proff 11/06/98: Added for high-res
   projectiony = ((SCREENHEIGHT * centerx * 320) / 200) / SCREENWIDTH * FRACUNIT;
-
+  // e6y: this is a precalculated value for more precise flats drawing (see R_MapPlane)
+  viewfocratio = 1.6f / ((float)SCREENWIDTH / (float)SCREENHEIGHT);
   R_InitBuffer (scaledviewwidth, viewheight);
 
   R_InitTextureMapping();
