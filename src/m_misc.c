@@ -1038,3 +1038,13 @@ void M_LoadDefaults (void)
 
   M_LoadDefaultsFile(defaultfile, FALSE);
 }
+
+// -----------------------
+// String to Uppercase
+// -----------------------
+char* M_Strupr(char* str)
+{
+  char* p;
+  for (p=str; *p; p++) *p = toupper(*p);
+  return str;
+}

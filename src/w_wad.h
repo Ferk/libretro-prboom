@@ -156,6 +156,9 @@ void ExtractFileBase(const char *, char *);       // killough
 unsigned W_LumpNameHash(const char *s);           // killough 1/31/98
 void W_HashLumps(void);                           // cph 2001/07/07 - made public
 
+filelump_t* W_OpenFile(wadfile_info_t *wadfile, wadinfo_t *wadheader);
+void W_ReleaseWad(wadfile_info_t* wadfile);
+
 void W_Exit(void);
 
 #endif

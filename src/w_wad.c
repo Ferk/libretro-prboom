@@ -124,109 +124,128 @@ char *AddDefaultExtension(char *path, const char *ext)
 static void W_AddFile(wadfile_info_t *wadfile) 
 // killough 1/31/98: static, const
 {
+   unsigned    i, startlump;
    wadinfo_t   header;
-   lumpinfo_t* lump_p;
-   unsigned    i;
-   int         length;
-   int         startlump;
-   filelump_t  *fileinfo = NULL;
-   filelump_t *fileinfo2free=NULL; //killough
-   filelump_t singleinfo;
-#ifndef MEMORY_LOW
-   struct stat statbuf;
-#endif
+   lumpinfo_t  *lump_p;
+   filelump_t  *file_p, *fileinfo = NULL;
 
    // open the file and add to directory
-
-#ifdef MEMORY_LOW
-   wadfile->handle = open(wadfile->name, O_RDONLY | O_BINARY);
-
-   if (wadfile->handle == -1) 
-#else
-      //precache into memory instead of reading from disk
-      wadfile->handle = fopen(wadfile->name, "rb");
-
-   if (wadfile->handle == 0) 
-#endif
-   {
-      if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
-            (strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".lmp" ) &&
-             strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".gwa" ) )
-         )
-         I_Error("W_AddFile: couldn't open %s",wadfile->name);
-      return;
+   fileinfo = W_OpenFile(wadfile, &header);
+   if (fileinfo == NULL) {
+     I_Error("W_AddFile: couldn't open %s", wadfile->name);
+     return;
    }
 
-#ifndef MEMORY_LOW
-   stat(wadfile->name, &statbuf);
-   wadfile->length = statbuf.st_size;
-   wadfile->data = malloc(statbuf.st_size);
-   fread(wadfile->data, statbuf.st_size, 1, wadfile->handle);
-#endif
-
-   //jff 8/3/98 use logical output routine
-   lprintf (LO_INFO," adding %s\n",wadfile->name);
    startlump = numlumps;
-
-   if (  strlen(wadfile->name)<=4 || 
-         (
-          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".wad") && 
-          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".gwa")
-         )
-      )
-   {
-      // single lump file
-      fileinfo = &singleinfo;
-      singleinfo.filepos = 0;
-#ifdef MEMORY_LOW
-      singleinfo.size = doom_wtohl(I_Filelength(wadfile->handle));
-#else
-      singleinfo.size = wadfile->length;
-#endif
-      ExtractFileBase(wadfile->name, singleinfo.name);
-      numlumps++;
-   }
-   else
-   {
-      // WAD file
-#ifdef MEMORY_LOW
-      I_Read(wadfile->handle, &header, sizeof(header));
-#else
-      memcpy(&header, wadfile->data, sizeof(header));
-#endif
-      if (strncmp(header.identification,"IWAD",4) &&
-            strncmp(header.identification,"PWAD",4))
-         I_Error("W_AddFile: Wad file %s doesn't have IWAD or PWAD id", wadfile->name);
-      header.numlumps = LONG(header.numlumps);
-      header.infotableofs = LONG(header.infotableofs);
-      length = header.numlumps*sizeof(filelump_t);
-      fileinfo2free = fileinfo = malloc(length);    // killough
-#ifdef MEMORY_LOW
-      lseek(wadfile->handle, header.infotableofs, SEEK_SET);
-      I_Read(wadfile->handle, fileinfo, length);
-#else
-      memcpy(fileinfo, &wadfile->data[header.infotableofs], length);
-#endif
-      numlumps += header.numlumps;
-   }
+   numlumps += header.numlumps;
 
    // Fill in lumpinfo
    lumpinfo = realloc(lumpinfo, numlumps*sizeof(lumpinfo_t));
 
    lump_p = &lumpinfo[startlump];
-
-   for (i=startlump ; (int)i<numlumps ; i++,lump_p++, fileinfo++)
+   file_p = fileinfo;
+   for (i=startlump ; (int)i<numlumps ; i++,lump_p++, file_p++)
    {
       lump_p->wadfile = wadfile;                    //  killough 4/25/98
-      lump_p->position = LONG(fileinfo->filepos);
-      lump_p->size = LONG(fileinfo->size);
+      lump_p->position = LONG(file_p->filepos);
+      lump_p->size = LONG(file_p->size);
       lump_p->li_namespace = ns_global;              // killough 4/17/98
-      strncpy (lump_p->name, fileinfo->name, 8);
+      strncpy (lump_p->name, file_p->name, 8);
       lump_p->source = wadfile->src;                    // Ty 08/29/98
    }
 
-   free(fileinfo2free);      // killough
+   free(fileinfo);
+   I_Error("W_AddFile: added %s", wadfile->name);
 }
+
+//
+// W_OpenFile
+//
+// DDDD
+filelump_t* W_OpenFile(wadfile_info_t *wadfile, wadinfo_t *wadheader)
+{
+  filelump_t* fileinfo = NULL;
+
+#ifndef MEMORY_LOW
+  struct stat statbuf;
+#endif
+
+#ifdef MEMORY_LOW
+  wadfile->handle = open(wadfile->name, O_RDONLY | O_BINARY);
+
+  if (wadfile->handle == -1)
+#else
+    //precache into memory instead of reading from disk
+    wadfile->handle = fopen(wadfile->name, "rb");
+
+  if (wadfile->handle == 0)
+#endif
+  {
+    if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
+      (strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".lmp" ) &&
+       strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".gwa" ) )
+      )
+    return NULL;
+  }
+
+#ifndef MEMORY_LOW
+  if (stat(wadfile->name, &statbuf) == -1)
+    return NULL;
+  else {
+    wadfile->length = statbuf.st_size;
+    wadfile->data = malloc(statbuf.st_size);
+    if (wadfile->data == NULL) return NULL;
+    fread(wadfile->data, statbuf.st_size, 1, wadfile->handle);
+  }
+#endif
+
+  if ( strlen(wadfile->name)<=4 ||
+       (
+         strcasecmp(wadfile->name+strlen(wadfile->name)-4,".wad") &&
+         strcasecmp(wadfile->name+strlen(wadfile->name)-4,".gwa")
+       )
+     )
+  {
+    // single lump file
+    fileinfo = (filelump_t*) malloc(sizeof(filelump_t));
+    if (fileinfo == NULL) return NULL;
+    fileinfo->filepos = 0;
+#ifdef MEMORY_LOW
+    fileinfo->size = doom_wtohl(I_Filelength(wadfile->handle));
+#else
+    fileinfo->size = wadfile->length;
+#endif
+    ExtractFileBase(wadfile->name, fileinfo->name);
+    wadheader->numlumps = 1;
+  }
+  else
+  {
+     // WAD file
+    size_t wadsize;
+#ifdef MEMORY_LOW
+    I_Read(wadfile->handle, wadheader, sizeof(*wadheader));
+#else
+    memcpy(wadheader, wadfile->data, sizeof(*wadheader));
+#endif
+    if (strncmp(wadheader->identification,"IWAD",4) &&
+        strncmp(wadheader->identification,"PWAD",4))
+      I_Error("W_OpenFile: Wad file %s doesn't have IWAD or PWAD id", wadfile->name);
+    wadheader->numlumps = LONG(wadheader->numlumps);
+    wadheader->infotableofs = LONG(wadheader->infotableofs);
+    wadsize = wadheader->numlumps*sizeof(filelump_t);
+    fileinfo = (filelump_t*) malloc(wadsize);
+    if (fileinfo == NULL) return NULL;
+#ifdef MEMORY_LOW
+    lseek(wadfile->handle, wadheader->infotableofs, SEEK_SET);
+    I_Read(wadfile->handle, fileinfo, wadsize);
+#else
+    memcpy(fileinfo, &wadfile->data[wadheader->infotableofs], wadsize);
+#endif
+  }
+
+  return fileinfo;
+}
+
 
 // jff 1/23/98 Create routines to reorder the master directory
 // putting all flats into one marked block, and all sprites into another.
@@ -453,8 +472,9 @@ void W_Init(void)
   { // CPhipps - new wadfiles array used 
     // open all the files, load headers, and count lumps
     unsigned i;
-    for (i=0; i < numwadfiles; i++)
+    for (i=0; i < numwadfiles; i++) {
       W_AddFile(&wadfiles[i]);
+    }
   }
 
   if (!numlumps)
@@ -479,48 +499,40 @@ void W_Init(void)
   W_InitCache();
 }
 
+void W_ReleaseWad(wadfile_info_t* wadfile)
+{
+  if (wadfile->handle) {
+#ifdef MEMORY_LOW
+    close(wadfile->handle);
+#else
+    fclose(wadfile->handle);
+    if (wadfile->data) free(wadfile->data);
+#endif
+    wadfile->handle = NULL;
+  }
+}
+
 void W_Exit(void)
 {
-	unsigned i;
-	for (i = 0; i < numwadfiles; i++)
-   {
-		if (wadfiles[i].handle)
-      {
-#ifdef MEMORY_LOW
-         close(wadfiles[i].handle);
-#else
-         fclose(wadfiles[i].handle);
-         free(wadfiles[i].data);
-#endif
-      }
-	}
+  unsigned i;
+  for (i = 0; i < numwadfiles; i++)
+    W_ReleaseWad(&(wadfiles[i]));
 }
 
 void W_ReleaseAllWads(void)
 {
-	unsigned i;
-	W_DoneCache();
+  unsigned i;
+  W_DoneCache();
 
-	for(i = 0; i < numwadfiles; i++)
-	{
-		if(wadfiles[i].handle)
-		{
-#ifdef MEMORY_LOW
-			close(wadfiles[i].handle);
-#else
-         fclose(wadfiles[i].handle);
-			free(wadfiles[i].data);
-#endif
-			wadfiles[i].handle = 0;
-		}
-	}
+  for(i = 0; i < numwadfiles; i++)
+    W_ReleaseWad(&(wadfiles[i]));
 
-	numwadfiles = 0;
-	free(wadfiles);
-	wadfiles = NULL;
-	numlumps = 0;
-	free(lumpinfo);
-	lumpinfo = NULL;
+  numwadfiles = 0;
+  free(wadfiles);
+  wadfiles = NULL;
+  numlumps = 0;
+  free(lumpinfo);
+  lumpinfo = NULL;
 }
 
 //

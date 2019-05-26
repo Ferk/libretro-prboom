@@ -82,6 +82,7 @@
 #include "d_deh.h"  // Ty 04/08/98 - Externalizations
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
+#include "uf_gameinfo.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -118,22 +119,6 @@ char    wadfile[PATH_MAX+1];       // primary wad file
 char    mapdir[PATH_MAX+1];        // directory of development maps
 char    baseiwad[PATH_MAX+1];      // jff 3/23/98: iwad directory
 char    basesavegame[PATH_MAX+1];  // killough 2/16/98: savegame directory
-
-//jff 4/19/98 list of standard IWAD names
-const char *const standard_iwads[]=
-{
-  "doom2f.wad",
-  "doom2.wad",
-  "plutonia.wad",
-  "tnt.wad",
-  "freedoom2.wad",
-  "doom.wad",
-  "doomu.wad", /* CPhipps - alow doomu.wad */
-  "freedoom1.wad",
-  "freedoom.wad",
-  "doom1.wad",
-};
-static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;
 
 /*
  * D_PostEvent - Event handling
@@ -681,24 +666,24 @@ static void NormalizeSlashes(char *str)
  * CPhipps  - static, proper prototype
  *    - 12/1999 - rewritten to use I_FindFile
  */
-static char *FindIWADFile(void)
+static const char *FindIWADFile(void)
 {
-  int   i, x;
-  char  * iwad  = NULL;
+  int   i;
 
-  i = M_CheckParm("-iwad");
-  lprintf(LO_ALWAYS, "i: %d\n", i);
+  lprintf(LO_INFO, " -- Commandline Arguments --\n");
+  for(i = 0; i < myargc; i++)
+    lprintf(LO_INFO, "   myargv[%d]: %s\n", i, myargv[i]);
+  lprintf(LO_INFO, " ---------------------------\n");
 
-  for(x = 0; x < 32; x++)
-     lprintf(LO_ALWAYS, "myargv[%d]: %s\n", x, myargv[x]);
-
-  if (i && (++i < myargc)) {
-    iwad = I_FindFile(myargv[i], NULL);
-  } else {
-    for (i=0; !iwad && i<nstandard_iwads; i++)
-      iwad = I_FindFile(standard_iwads[i], NULL);
+  if ((i = M_CheckParm("-iwad")) && ++i < myargc) {
+    char* iwad = I_FindFile(myargv[i], NULL);
+    UF_GameInfoInit(iwad);
+    free(iwad);
   }
-  return iwad;
+  else if ((i = M_CheckParm("-file")) && ++i < myargc) {
+    UF_GameInfoInit(myargv[i]);
+  }
+  return gameinfo.iwadFile;
 }
 
 //
@@ -788,7 +773,6 @@ static bool IdentifyVersion (void)
       //jff 9/3/98 use logical output routine
       lprintf(LO_WARN,"Unknown Game Version, may not work\n");
     D_AddFile(iwad,source_iwad);
-    free(iwad);
   }
   else
     return I_Error("IdentifyVersion: IWAD not found\n");
@@ -1120,46 +1104,15 @@ bool D_DoomMainSetup(void)
       deathmatch = 1;
 
   {
-    // CPhipps - localise title variable
-    // print title for every printed line
-    // cph - code cleaned and made smaller
-    const char* doomverstr;
-
-    switch ( gamemode ) {
-    case retail:
-      doomverstr = "The Ultimate DOOM";
-      break;
-    case shareware:
-      doomverstr = "DOOM Shareware";
-      break;
-    case registered:
-      doomverstr = "DOOM Registered";
-      break;
-    case commercial:  // Ty 08/27/98 - fixed gamemode vs gamemission
-      switch (gamemission)
-      {
-        case pack_plut:
-    doomverstr = "DOOM 2: Plutonia Experiment";
-          break;
-        case pack_tnt:
-          doomverstr = "DOOM 2: TNT - Evilution";
-          break;
-        default:
-          doomverstr = "DOOM 2: Hell on Earth";
-          break;
-      }
-      break;
-    default:
-      doomverstr = "Public DOOM";
-      break;
-    }
-
     /* cphipps - the main display. This shows the build date, copyright, and game type */
-    lprintf(LO_ALWAYS,"PrBoom, playing: %s\n"
+    lprintf(LO_ALWAYS,
+      "========================================\n"
+      "Playing: %s\n"
       "PrBoom is released under the GNU General Public license v2.0.\n"
       "You are welcome to redistribute it under certain conditions.\n"
-      "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n",
-      doomverstr);
+      "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n"
+      "========================================\n",
+      (gameinfo.banner? gameinfo.banner : "Public DOOM"));
   }
 
   modifiedgame = FALSE;

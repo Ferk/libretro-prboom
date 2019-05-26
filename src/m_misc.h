@@ -52,6 +52,8 @@ void M_LoadDefaults (void);
 
 void M_SaveDefaults (void);
 
+char* M_Strupr(char* str);
+
 struct default_s *M_LookupDefault(const char *name);     /* killough 11/98 */
 
 // phares 4/21/98:
