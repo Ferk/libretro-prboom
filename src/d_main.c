@@ -84,6 +84,7 @@
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
 #include "u_mapinfo.h"
+#include "u_gameinfo.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -120,22 +121,6 @@ char    wadfile[PATH_MAX+1];       // primary wad file
 char    mapdir[PATH_MAX+1];        // directory of development maps
 char    baseiwad[PATH_MAX+1];      // jff 3/23/98: iwad directory
 char    basesavegame[PATH_MAX+1];  // killough 2/16/98: savegame directory
-
-//jff 4/19/98 list of standard IWAD names
-const char *const standard_iwads[]=
-{
-  "doom2f.wad",
-  "doom2.wad",
-  "plutonia.wad",
-  "tnt.wad",
-  "freedoom2.wad",
-  "doom.wad",
-  "doomu.wad", /* CPhipps - alow doomu.wad */
-  "freedoom1.wad",
-  "freedoom.wad",
-  "doom1.wad",
-};
-static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;
 
 /*
  * D_PostEvent - Event handling
@@ -540,119 +525,6 @@ static const char *D_dehout(void)
   return (p && ++p < myargc ? myargv[p] : NULL);
 }
 
-//
-// CheckIWAD
-//
-// Verify a file is indeed tagged as an IWAD
-// Scan its lumps for levelnames and return gamemode as indicated
-// Detect missing wolf levels in DOOM II
-//
-// The filename to check is passed in iwadname, the gamemode detected is
-// returned in gmode, hassec returns the presence of secret levels
-//
-// jff 4/19/98 Add routine to test IWAD for validity and determine
-// the gamemode from it. Also note if DOOM II, whether secret levels exist
-// CPhipps - const char* for iwadname, made static
-static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
-{
-  int read_iwad = 0;
-  FILE* fp = fopen(iwadname, "rb");
-
-  if (fp != NULL)
-     read_iwad = 1;
-
-  fclose(fp);
-
-  if ( read_iwad )
-  {
-    int ud=0,rg=0,sw=0,cm=0,sc=0;
-
-    // Identify IWAD correctly
-    if ((fp = fopen(iwadname, "rb")))
-    {
-      wadinfo_t header;
-
-      // read IWAD header
-      if (fread(&header, sizeof(header), 1, fp) == 1 && !strncmp(header.identification, "IWAD", 4))
-      {
-        size_t length;
-        filelump_t *fileinfo;
-
-        // read IWAD directory
-        header.numlumps = LONG(header.numlumps);
-        header.infotableofs = LONG(header.infotableofs);
-        length = header.numlumps;
-        fileinfo = malloc(length*sizeof(filelump_t));
-        if (fseek (fp, header.infotableofs, SEEK_SET) ||
-            fread (fileinfo, sizeof(filelump_t), length, fp) != length)
-          I_Error("CheckIWAD: failed to read directory %s",iwadname);
-
-        // scan directory for levelname lumps
-        while (length--)
-          if (fileinfo[length].name[0] == 'E' &&
-              fileinfo[length].name[2] == 'M' &&
-              fileinfo[length].name[4] == 0)
-          {
-            if (fileinfo[length].name[1] == '4')
-              ++ud;
-            else if (fileinfo[length].name[1] == '3')
-              ++rg;
-            else if (fileinfo[length].name[1] == '2')
-              ++rg;
-            else if (fileinfo[length].name[1] == '1')
-              ++sw;
-          }
-          else if (fileinfo[length].name[0] == 'M' &&
-                    fileinfo[length].name[1] == 'A' &&
-                    fileinfo[length].name[2] == 'P' &&
-                    fileinfo[length].name[5] == 0)
-          {
-            ++cm;
-            if (fileinfo[length].name[3] == '3')
-              if (fileinfo[length].name[4] == '1' ||
-                  fileinfo[length].name[4] == '2')
-                ++sc;
-          }
-
-        free(fileinfo);
-      }
-      else // missing IWAD tag in header
-      {
-        fclose(fp);
-        return I_Error("CheckIWAD: IWAD tag %s not present", iwadname);
-      }
-
-      fclose(fp);
-    }
-    else // error from open call
-      return I_Error("CheckIWAD: Can't open IWAD %s", iwadname);
-
-    // Determine game mode from levels present
-    // Must be a full set for whichever mode is present
-    // Lack of wolf-3d levels also detected here
-
-    *gmode = indetermined;
-    *hassec = FALSE;
-    if (cm>=30)
-    {
-      *gmode = commercial;
-      *hassec = sc>=2;
-    }
-    else if (ud>=9)
-      *gmode = retail;
-    else if (rg>=18)
-      *gmode = registered;
-    else if (sw>=9)
-      *gmode = shareware;
-  }
-  else // error from access call
-    return I_Error("CheckIWAD: IWAD %s not readable", iwadname);
-
-  return true;
-}
-
-
-
 // NormalizeSlashes
 //
 // Remove trailing slashes, translate backslashes to slashes
@@ -677,126 +549,36 @@ static void NormalizeSlashes(char *str)
 }
 
 /*
- * FindIWADFIle
+ * IdentifyIWAD
  *
- * Search for one of the standard IWADs
- * CPhipps  - static, proper prototype
- *    - 12/1999 - rewritten to use I_FindFile
+ * Locate, validate and load an IWAD file based on the commandline arguments
+ * The Gameinfo configuration will be initialized,
+ *
+ * Returns TRUE if a valid IWAD was found, false otherwise.
  */
-static char *FindIWADFile(void)
+static boolean IdentifyIWAD(void)
 {
-  int   i, x;
-  char  * iwad  = NULL;
+  int   i;
 
-  i = M_CheckParm("-iwad");
-  lprintf(LO_DEBUG, "i: %d\n", i);
+  lprintf(LO_INFO, " -- Commandline Arguments --\n");
+  for(i = 0; i < myargc; i++)
+    lprintf(LO_INFO, "   myargv[%d]: %s\n", i, myargv[i]);
+  lprintf(LO_INFO, " ---------------------------\n");
 
-  for(x = 0; x < 32; x++)
-     lprintf(LO_DEBUG, "myargv[%d]: %s\n", x, myargv[x]);
-
-  if (i && (++i < myargc)) {
-    iwad = I_FindFile(myargv[i], NULL);
-  } else {
-    for (i=0; !iwad && i<nstandard_iwads; i++)
-      iwad = I_FindFile(standard_iwads[i], NULL);
-  }
-  return iwad;
-}
-
-//
-// IdentifyVersion
-//
-// Set the location of the defaults file and the savegame root
-// Locate and validate an IWAD file
-// Determine gamemode from the IWAD
-//
-// supports IWADs with custom names. Also allows the -iwad parameter to
-// specify which iwad is being searched for if several exist in one dir.
-// The -iwad parm may specify:
-//
-// 1) a specific pathname, which must exist (.wad optional)
-// 2) or a directory, which must contain a standard IWAD,
-// 3) or a filename, which must be found in one of the standard places:
-//   a) current dir,
-//   b) exe dir
-//   c) $DOOMWADDIR
-//   d) or $HOME
-//
-// jff 4/19/98 rewritten to use a more advanced search algorithm
-
-static bool IdentifyVersion (void)
-{
-  int         i;    //jff 3/24/98 index of args on commandline
-  struct stat sbuf; //jff 3/24/98 used to test save path for existence
-  char *iwad       = NULL;
-
-  // set save path to -save parm or current dir
-
-  strcpy(basesavegame,I_DoomExeDir());
-  lprintf(LO_INFO, "IdentifyVersion: basesavegame: %s\n", basesavegame);
-#ifndef __CELLOS_LV2__
-  if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
-  {
-    if (!stat(myargv[i+1],&sbuf) && S_ISDIR(sbuf.st_mode)) // and is a dir
-    {
-      strcpy(basesavegame,myargv[i+1]);  //jff 3/24/98 use that for savegame
-      NormalizeSlashes(basesavegame);    //jff 9/22/98 fix c:\ not working
-    }
-    //jff 9/3/98 use logical output routine
-    else lprintf(LO_ERROR,"Error: -save path does not exist, using %s\n", basesavegame);
-  }
-#endif
-
-  // locate the IWAD and determine game mode from it
-
-  iwad = FindIWADFile();
-  lprintf(LO_INFO, "iwad: %s\n", iwad);
-
-  if (iwad && *iwad)
-  {
-    //jff 9/3/98 use logical output routine
-    lprintf(LO_CONFIRM,"IWAD found: %s\n",iwad); //jff 4/20/98 print only if found
-    if (!CheckIWAD(iwad,&gamemode,&haswolflevels))
-       return false;
-
-    /* jff 8/23/98 set gamemission global appropriately in all cases
-     * cphipps 12/1999 - no version output here, leave that to the caller
-     */
-    switch(gamemode)
-    {
-      case retail:
-      case registered:
-      case shareware:
-        i = strlen(iwad);
-        gamemission = doom;
-        if ( (i>=11 && !strncasecmp(iwad+i-11,"heretic.wad",11)) ||
-             (i>=13 && (!strncasecmp(iwad+i-13,"hereticsr.wad",13))) )
-          return I_Error("IdentifyVersion: Heretic is not supported");
-        break;
-      case commercial:
-        i = strlen(iwad);
-        gamemission = doom2;
-        if (i>=10 && !strncasecmp(iwad+i-10,"doom2f.wad",10))
-          language=french;
-        else if (i>=7 && !strncasecmp(iwad+i-7,"tnt.wad",7))
-          gamemission = pack_tnt;
-        else if (i>=12 && !strncasecmp(iwad+i-12,"plutonia.wad",12))
-          gamemission = pack_plut;
-        break;
-      default:
-        gamemission = none;
-        break;
-    }
-    if (gamemode == indetermined)
-      //jff 9/3/98 use logical output routine
-      lprintf(LO_WARN,"Unknown Game Version, may not work\n");
-    D_AddFile(iwad,source_iwad);
+  if ((i = M_CheckParm("-iwad")) && ++i < myargc) {
+    char* iwad = I_FindFile(myargv[i], NULL);
+    U_GameInfoInit(iwad);
     free(iwad);
   }
-  else
-    return I_Error("IdentifyVersion: IWAD not found\n");
+  else if ((i = M_CheckParm("-file")) && ++i < myargc) {
+    U_GameInfoInit(myargv[i]);
+  }
 
-  return true;
+  if (gameinfo.iwadFile) {
+    D_AddFile(gameinfo.iwadFile, source_iwad);
+    return TRUE;
+  }
+  else return FALSE;
 }
 
 
@@ -1092,7 +874,28 @@ bool D_DoomMainSetup(void)
   D_BuildBEXTables(); // haleyjd
 
   DoLooseFiles();  // Ty 08/29/98 - handle "loose" files on command line
-  if (!IdentifyVersion())
+
+  // set save path to -save parm or current dir
+  strcpy(basesavegame,I_DoomExeDir());
+  lprintf(LO_ALWAYS, "basesavegame: %s\n", basesavegame);
+#ifndef __CELLOS_LV2__
+  {
+    int i; //jff 3/24/98 index of args on commandline
+    if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
+    {
+      struct stat sbuf; //jff 3/24/98 used to test save path for existence
+      if (!stat(myargv[i+1],&sbuf) && S_ISDIR(sbuf.st_mode)) // and is a dir
+      {
+        strcpy(basesavegame,myargv[i+1]);  //jff 3/24/98 use that for savegame
+        NormalizeSlashes(basesavegame);    //jff 9/22/98 fix c:\ not working
+      }
+      //jff 9/3/98 use logical output routine
+      else lprintf(LO_ERROR,"Error: -save path does not exist, using %s\n", basesavegame);
+    }
+  }
+#endif
+
+  if (!IdentifyIWAD())
      goto failed;
 
   // Load prboom.wad after IWAD but before everything else
@@ -1123,46 +926,15 @@ bool D_DoomMainSetup(void)
       deathmatch = 1;
 
   {
-    // CPhipps - localise title variable
-    // print title for every printed line
-    // cph - code cleaned and made smaller
-    const char* doomverstr;
-
-    switch ( gamemode ) {
-    case retail:
-      doomverstr = "The Ultimate DOOM";
-      break;
-    case shareware:
-      doomverstr = "DOOM Shareware";
-      break;
-    case registered:
-      doomverstr = "DOOM Registered";
-      break;
-    case commercial:  // Ty 08/27/98 - fixed gamemode vs gamemission
-      switch (gamemission)
-      {
-        case pack_plut:
-    doomverstr = "DOOM 2: Plutonia Experiment";
-          break;
-        case pack_tnt:
-          doomverstr = "DOOM 2: TNT - Evilution";
-          break;
-        default:
-          doomverstr = "DOOM 2: Hell on Earth";
-          break;
-      }
-      break;
-    default:
-      doomverstr = "Public DOOM";
-      break;
-    }
-
     /* cphipps - the main display. This shows the build date, copyright, and game type */
-    lprintf(LO_INFO,"PrBoom, playing: %s\n"
+    lprintf(LO_ALWAYS,
+      "========================================\n"
+      "Playing: %s\n"
       "PrBoom is released under the GNU General Public license v2.0.\n"
       "You are welcome to redistribute it under certain conditions.\n"
-      "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n",
-      doomverstr);
+      "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n"
+      "========================================\n",
+      (gameinfo.banner? gameinfo.banner : "Public DOOM"));
   }
 
   modifiedgame = FALSE;
@@ -1193,7 +965,7 @@ bool D_DoomMainSetup(void)
   {
     startmap = 0; // Ty 08/29/98 - allow "-warp x" to go to first map in wad(s)
     autostart = TRUE; // Ty 08/29/98 - move outside the decision tree
-    if (gamemode == commercial)
+    if (gameinfo.firstMap[0] == 'M')
     {
       if (p < myargc-1)
         startmap = atoi(myargv[p+1]);   // Ty 08/29/98 - add test if last parm
@@ -1423,7 +1195,7 @@ bool D_DoomMainSetup(void)
     {
       const char *data;
       lprintf(LO_INFO,"U_ParseMapInfo: Loading Custom Episode and Map Information.\n");
-      data = (const char *)W_CacheLumpNum(p);
+      data = (const byte *)W_CacheLumpNum(p);
       U_ParseMapInfo(data, W_LumpLength(p));
     }
   }

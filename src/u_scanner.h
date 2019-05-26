@@ -88,7 +88,7 @@ typedef struct
 } u_scanner_t;
 
 
-u_scanner_t  U_ScanOpen(const char* data, int length, const char *name);
+u_scanner_t  U_ScanOpen(const byte *data, int length, const char *name);
 void         U_ScanClose(u_scanner_t* scanner);
 boolean      U_GetNextToken(u_scanner_t* scanner, boolean expandState);
 boolean      U_GetNextLineToken(u_scanner_t* scanner);
@@ -104,5 +104,8 @@ boolean      U_CheckFloat(u_scanner_t* s);
 void         U_Error(u_scanner_t* s, const char *msg, ...);
 void         U_ErrorToken(u_scanner_t* s, int token);
 void         U_ErrorString(u_scanner_t* s, const char *mustget);
+
+void         U_SetString(char **ptr, const char *start, int length);
+void         U_ReplaceString(char **ptr, const char *newstring);
 
 #endif /* __U_SCANNER_H__ */

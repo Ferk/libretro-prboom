@@ -81,7 +81,7 @@ void U_ParseMusInfo(const char *mapid)
   if (musinfolump != -1)
   {
     u_scanner_t s;
-    const char *data = W_CacheLumpNum(musinfolump);
+    const byte *data = W_CacheLumpNum(musinfolump);
     int datalength = W_LumpLength(musinfolump);
     int i, lumpnum, musitem;
     boolean inMap = false;

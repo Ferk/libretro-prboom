@@ -56,7 +56,7 @@ void U_ExpandState(u_scanner_t* scanner);
 void U_Unescape(char *str);
 void U_SetString(char **ptr, const char *start, int length);
 
-u_scanner_t U_ScanOpen(const char* data, int length, const char* name)
+u_scanner_t U_ScanOpen(const byte *data, int length, const char *name)
 {
   u_scanner_t scanner;
   scanner.lineStart = scanner.logicalPosition = scanner.scanPos = scanner.tokenLinePosition = 0;
@@ -66,8 +66,8 @@ u_scanner_t U_ScanOpen(const char* data, int length, const char* name)
   scanner.nextState.string = NULL;
   scanner.name = name;
 
-  if(length == -1)
-    length = strlen(data);
+  if(!length)
+    length = strlen((const char*) data);
   scanner.length = length;
   scanner.data = (char*) malloc(sizeof(char)*length);
   memcpy(scanner.data, data, length);
@@ -732,4 +732,10 @@ void U_SetString(char **ptr, const char *start, int length)
   *ptr = (char*)malloc(length + 1);
   memcpy(*ptr, start, length);
   (*ptr)[length] = '\0';
+}
+
+void U_ReplaceString(char **pptr, const char *newstring)
+{
+  if (*pptr != NULL) free(*pptr);
+  *pptr = strdup(newstring);
 }

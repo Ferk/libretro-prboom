@@ -2175,6 +2175,38 @@ void G_ScaleMovementToFramerate (void)
   angleturn[2] = (160  * TICRATE) / tic_vars.fps;
 }
 
+
+
+//
+// G_ValidateMapName
+// Parse map name and attempt to extract episode and map numbers
+// and set them to the given addresses.
+// If not episode and/or map was found, a value of -1 will be stored in the given value.
+// WADS using MAPxx format will always return Episode -1
+//
+int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
+{
+  // Check if the given map name can be expressed as a gameepisode/gamemap pair and be reconstructed from it.
+  char lumpname[9], mapuname[9];
+  int epi = -1, map = -1;
+
+  if (strlen(mapname) > 8) return 0;
+  strncpy(mapuname, mapname, 8);
+  mapuname[8] = 0;
+  M_Strupr(mapuname);
+
+
+  if (sscanf(mapuname, "MAP%d", &map) == 1)
+    snprintf(lumpname, 9, "MAP%02d", map);
+  else if (sscanf(mapuname, "E%dM%d", &epi, &map) == 2)
+    snprintf(lumpname, 9, "E%dM%d", epi, map);
+  else return 0;
+
+  if (pEpi) *pEpi = epi;
+  if (pMap) *pMap = map;
+  return !strcmp(mapuname, lumpname);
+}
+
 //
 //
 //
@@ -2208,30 +2240,6 @@ mapentry_t *G_LookupMapinfoByName(const char *lumpname)
     }
   }
   return NULL;
-}
-
-
-int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
-{
-  // Check if the given map name can be expressed as a gameepisode/gamemap pair and be reconstructed from it.
-  char lumpname[9], mapuname[9];
-  int epi = -1, map = -1;
-
-  if (strlen(mapname) > 8) return 0;
-  strncpy(mapuname, mapname, 8);
-  mapuname[8] = 0;
-  M_Strupr(mapuname);
-
-
-  if (sscanf(mapuname, "MAP%d", &map) == 1)
-    snprintf(lumpname, 9, "MAP%02d", map);
-  else if (sscanf(mapuname, "E%dM%d", &epi, &map) == 2)
-    snprintf(lumpname, 9, "E%dM%d", epi, map);
-  else return 0;
-
-  if (pEpi) *pEpi = epi;
-  if (pMap) *pMap = map;
-  return !strcmp(mapuname, lumpname);
 }
 
 

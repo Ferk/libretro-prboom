@@ -50,12 +50,6 @@ static void FreeMap(mapentry_t *mape)
   mape->mapname = NULL;
 }
 
-static void ReplaceString(char **pptr, const char *newstring)
-{
-  if (*pptr != NULL) free(*pptr);
-  *pptr = strdup(newstring);
-}
-
 
 // -----------------------------------------------
 // Parses a set of string and concatenates them
@@ -141,7 +135,7 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   if (!strcasecmp(pname, "levelname"))
   {
     if (U_MustGetToken(s, TK_StringConst))
-      ReplaceString(&mape->levelname, s->string);
+      U_ReplaceString(&mape->levelname, s->string);
   }
   else if (!strcasecmp(pname, "episode"))
   {
@@ -314,7 +308,7 @@ static int ParseMapEntry(u_scanner_t *s, mapentry_t *val)
     return 0;
   }
 
-  ReplaceString(&val->mapname, s->string);
+  U_ReplaceString(&val->mapname, s->string);
   U_MustGetToken(s, '{');
   while(!U_CheckToken(s, '}'))
   {
@@ -331,7 +325,7 @@ static int ParseMapEntry(u_scanner_t *s, mapentry_t *val)
 //
 // -----------------------------------------------
 
-int U_ParseMapInfo(const char *buffer, size_t length)
+int U_ParseMapInfo(const byte *buffer, size_t length)
 {
   unsigned int i;
   u_scanner_t scanner = U_ScanOpen(buffer, length, "UMAPINFO");
