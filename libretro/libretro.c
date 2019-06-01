@@ -559,7 +559,8 @@ bool retro_load_game(const struct retro_game_info *info)
       else
       {
         header = get_wadinfo(info->path);
-        if(header.identification == NULL)
+        // header.identification is static array, always non-NULL, but it might be empty if it couldn't be read
+        if(header.identification[0] == 0)
         {
           I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
           goto failed;
@@ -574,9 +575,8 @@ bool retro_load_game(const struct retro_game_info *info)
           argv[argc++] = strdup("-file");
           argv[argc++] = strdup(info->path);
         }
-        else
-        {
-          I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
+        else {
+          I_Error("retro_load_game: invalid WAD header '%.*s'", 4, header.identification);
           goto failed;
         }
 

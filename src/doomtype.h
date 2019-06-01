@@ -44,6 +44,12 @@
 #include "custombool.h"
 #endif
 
+#include <inttypes.h>
+
+#ifndef PRIu64
+#define PRIu64 "I64u"
+#endif
+
 //e6y
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
