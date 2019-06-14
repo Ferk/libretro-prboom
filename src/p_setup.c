@@ -114,6 +114,14 @@ enum
    ML_GL_NODES     // GL BSP nodes
 };
 
+typedef enum
+{
+   MF_DOOM,
+   MF_HEXEN,
+
+   MF_UNKNOWN
+} mapformat_t;
+
 
 static float fast_sqrt(float n)
 {
@@ -161,7 +169,7 @@ static boolean CheckForGLBSPLumps(int gl_lumpnum)
 
   for (i = 0, e = ML_GL_VERTS; e <= ML_GL_NODES; i++, e++)
     if (gl_lumpnum + e >= numlumps
-        || strncasecmp(lumpinfo[gl_lumpnum + e].name, names[i], 8))
+        || strnicmp(lumpinfo[gl_lumpnum + e].name, names[i], 8))
       return FALSE;
 
   return TRUE;
@@ -870,30 +878,44 @@ static void P_LoadXNOD(int lump)
 =================
 */
 
-static void P_LoadThings (int lump)
+static void P_LoadThings (int lump, mapformat_t mapformat)
 {
-  int  i, numthings = W_LumpLength (lump) / sizeof(mapthing_t);
+  boolean hexen = (mapformat == MF_HEXEN);
+  int  i, numthings = W_LumpLength (lump) / (hexen ? sizeof(mapthing_hexen_t) : sizeof(mapthing_t));
   const mapthing_t *data = W_CacheLumpNum (lump);
+  const mapthing_hexen_t *hxdata = (const mapthing_hexen_t *) data;
 
   if ((!data) || (!numthings))
     I_Error("P_LoadThings: no things in level");
 
   for (i=0; i<numthings; i++)
-    {
-      mapthing_t mt = data[i];
+  {
+    mapthing_t mt = data[i];
+    mapthing_hexen_t mth = hxdata[i];
 
+    if (hexen)
+    {
+      mt.x = SHORT(mth.x);
+      mt.y = SHORT(mth.y);
+      mt.angle = SHORT(mth.angle);
+      mt.type = SHORT(mth.type);
+      mt.options = SHORT(mth.options);
+    }
+    else
+    {
       mt.x = SHORT(mt.x);
       mt.y = SHORT(mt.y);
       mt.angle = SHORT(mt.angle);
       mt.type = SHORT(mt.type);
       mt.options = SHORT(mt.options);
-
-      if (!P_IsDoomnumAllowed(mt.type))
-        continue;
-
-      // Do spawn all other stuff.
-      P_SpawnMapThing(&mt);
     }
+
+    if (!P_IsDoomnumAllowed(mt.type))
+      continue;
+
+    // Do spawn all other stuff.
+    P_SpawnMapThing(&mt);
+  }
 
   W_UnlockLumpNum(lump); // cph - release the data
 }
@@ -906,99 +928,120 @@ static void P_LoadThings (int lump)
 = Also counts secret lines for intermissions
 =================
 */
-static void P_LoadLineDefs (int lump)
+static void P_LoadLineDefs (int lump, mapformat_t mapformat)
 {
   const uint8_t *data; // cph - const*
   int  i;
+  boolean hexen = (mapformat == MF_HEXEN);
 
-  numlines = W_LumpLength (lump) / sizeof(maplinedef_t);
+  numlines = W_LumpLength (lump) / (hexen? sizeof(maplinedef_hexen_t) : sizeof(maplinedef_t));
   lines = Z_Calloc (numlines,sizeof(line_t),PU_LEVEL,0);
   data = W_CacheLumpNum (lump); // cph - wad lump handling updated
 
   for (i=0; i<numlines; i++)
-    {
-      const maplinedef_t *mld = (const maplinedef_t *) data + i;
-      line_t *ld = lines+i;
-      vertex_t *v1, *v2;
+  {
+    const maplinedef_t *mld = (const maplinedef_t *) data + i;
+    const maplinedef_hexen_t *mldh = (const maplinedef_hexen_t *) data + i;
+    line_t *ld = lines+i;
+    vertex_t *v1, *v2;
 
+    if (hexen)
+    {
+      ld->flags = (unsigned short)SHORT(mldh->flags);
+      ld->special = mldh->special;
+      ld->tag = 0;
+      v1 = ld->v1 = &vertexes[(unsigned short)SHORT(mldh->v1)];
+      v2 = ld->v2 = &vertexes[(unsigned short)SHORT(mldh->v2)];
+    }
+    else
+    {
       ld->flags = (unsigned short)SHORT(mld->flags);
       ld->special = SHORT(mld->special);
       ld->tag = SHORT(mld->tag);
       v1 = ld->v1 = &vertexes[(unsigned short)SHORT(mld->v1)];
       v2 = ld->v2 = &vertexes[(unsigned short)SHORT(mld->v2)];
-      ld->dx = v2->x - v1->x;
-      ld->dy = v2->y - v1->y;
+    }
+    ld->dx = v2->x - v1->x;
+    ld->dy = v2->y - v1->y;
 
-      ld->slopetype = !ld->dx ? ST_VERTICAL : !ld->dy ? ST_HORIZONTAL :
-        FixedDiv(ld->dy, ld->dx) > 0 ? ST_POSITIVE : ST_NEGATIVE;
+    ld->slopetype = !ld->dx ? ST_VERTICAL : !ld->dy ? ST_HORIZONTAL :
+      FixedDiv(ld->dy, ld->dx) > 0 ? ST_POSITIVE : ST_NEGATIVE;
 
-      if (v1->x < v2->x)
-        {
-          ld->bbox[BOXLEFT] = v1->x;
-          ld->bbox[BOXRIGHT] = v2->x;
-        }
-      else
-        {
-          ld->bbox[BOXLEFT] = v2->x;
-          ld->bbox[BOXRIGHT] = v1->x;
-        }
-      if (v1->y < v2->y)
-        {
-          ld->bbox[BOXBOTTOM] = v1->y;
-          ld->bbox[BOXTOP] = v2->y;
-        }
-      else
-        {
-          ld->bbox[BOXBOTTOM] = v2->y;
-          ld->bbox[BOXTOP] = v1->y;
-        }
+    if (v1->x < v2->x)
+    {
+      ld->bbox[BOXLEFT] = v1->x;
+      ld->bbox[BOXRIGHT] = v2->x;
+    }
+    else
+    {
+      ld->bbox[BOXLEFT] = v2->x;
+      ld->bbox[BOXRIGHT] = v1->x;
+    }
+    if (v1->y < v2->y)
+    {
+      ld->bbox[BOXBOTTOM] = v1->y;
+      ld->bbox[BOXTOP] = v2->y;
+    }
+    else
+    {
+      ld->bbox[BOXBOTTOM] = v2->y;
+      ld->bbox[BOXTOP] = v1->y;
+    }
 
-      /* calculate sound origin of line to be its midpoint */
-      //e6y: fix sound origin for large levels
-      // no need for comp_sound test, these are only used when comp_sound = 0
-      ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
-      ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
+    /* calculate sound origin of line to be its midpoint */
+    //e6y: fix sound origin for large levels
+    // no need for comp_sound test, these are only used when comp_sound = 0
+    ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
+    ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
 
-      ld->iLineID=i; // proff 04/05/2000: needed for OpenGL
+    ld->iLineID=i; // proff 04/05/2000: needed for OpenGL
+    if (mapformat == MF_HEXEN)
+    {
+      ld->sidenum[0] = SHORT(mldh->sidenum[0]);
+      ld->sidenum[1] = SHORT(mldh->sidenum[1]);
+    }
+    else
+    {
       ld->sidenum[0] = SHORT(mld->sidenum[0]);
       ld->sidenum[1] = SHORT(mld->sidenum[1]);
+    }
 
-      { 
-        /* cph 2006/09/30 - fix sidedef errors right away.
-         * cph 2002/07/20 - these errors are fatal if not fixed, so apply them
-         * in compatibility mode - a desync is better than a crash! */
-        int j;
-        
-        for (j=0; j < 2; j++)
-        {
-          if (ld->sidenum[j] != NO_INDEX && ld->sidenum[j] >= numsides) {
-            ld->sidenum[j] = NO_INDEX;
-            lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                    " has out-of-range sidedef number\n", i);
-          }
-        }
-        
-        // killough 11/98: fix common wad errors (missing sidedefs):
-        
-        if (ld->sidenum[0] == NO_INDEX) {
-          ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
-          // cph - print a warning about the bug
+    {
+      /* cph 2006/09/30 - fix sidedef errors right away.
+       * cph 2002/07/20 - these errors are fatal if not fixed, so apply them
+       * in compatibility mode - a desync is better than a crash! */
+      int j;
+
+      for (j=0; j < 2; j++)
+      {
+        if (ld->sidenum[j] != NO_INDEX && ld->sidenum[j] >= numsides) {
+          ld->sidenum[j] = NO_INDEX;
           lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                  " missing first sidedef\n", i);
-        }
-        
-        if ((ld->sidenum[1] == NO_INDEX) && (ld->flags & ML_TWOSIDED)) {
-          ld->flags &= ~ML_TWOSIDED;  // Clear 2s flag for missing left side
-          // cph - print a warning about the bug
-          lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                  " has two-sided flag set, but no second sidedef\n", i);
+                  " has out-of-range sidedef number\n", i);
         }
       }
 
-      // killough 4/4/98: support special sidedef interpretation below
-      if (ld->sidenum[0] != NO_INDEX && ld->special)
-        sides[*ld->sidenum].special = ld->special;
+      // killough 11/98: fix common wad errors (missing sidedefs):
+
+      if (ld->sidenum[0] == NO_INDEX) {
+        ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
+        // cph - print a warning about the bug
+        lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
+                " missing first sidedef\n", i);
+      }
+
+      if ((ld->sidenum[1] == NO_INDEX) && (ld->flags & ML_TWOSIDED)) {
+        ld->flags &= ~ML_TWOSIDED;  // Clear 2s flag for missing left side
+        // cph - print a warning about the bug
+        lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
+                " has two-sided flag set, but no second sidedef\n", i);
+      }
     }
+
+    // killough 4/4/98: support special sidedef interpretation below
+    if (ld->sidenum[0] != NO_INDEX && ld->special)
+      sides[*ld->sidenum].special = ld->special;
+  }
 
   W_UnlockLumpNum(lump); // cph - release the lump
 }
@@ -1731,6 +1774,103 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
   free(hit);
 }
 
+
+//
+// P_CheckLumpsForSameSource
+//
+// Are these lumps in the same wad file?
+//
+
+boolean P_CheckLumpsForSameSource(int lump1, int lump2)
+{
+  int wad1_index, wad2_index;
+  wadfile_info_t *wad1, *wad2;
+
+  if (((unsigned)lump1 >= (unsigned)numlumps) || ((unsigned)lump2 >= (unsigned)numlumps))
+    return FALSE;
+
+  wad1 = lumpinfo[lump1].wadfile;
+  wad2 = lumpinfo[lump2].wadfile;
+
+  if (!wad1 || !wad2)
+    return FALSE;
+
+  wad1_index = (int)(wad1 - wadfiles);
+  wad2_index = (int)(wad2 - wadfiles);
+
+  if (wad1_index != wad2_index)
+    return FALSE;
+
+  if ((wad1_index < 0) || ((size_t)wad1_index >= numwadfiles))
+    return FALSE;
+
+  if ((wad2_index < 0) || ((size_t)wad2_index >= numwadfiles))
+    return FALSE;
+
+  return TRUE;
+}
+
+//
+// P_CheckLevelFormat
+//
+// Checking for presence of necessary lumps
+//
+
+mapformat_t P_CheckLevelWadStructure(const char *mapname)
+{
+  int i, lumpnum;
+
+  static const char *ml_labels[] = {
+    "ML_LABEL",             // A separator, name, ExMx or MAPxx
+    "ML_THINGS",            // Monsters, items..
+    "ML_LINEDEFS",          // LineDefs, from editing
+    "ML_SIDEDEFS",          // SideDefs, from editing
+    "ML_VERTEXES",          // Vertices, edited and BSP splits generated
+    "ML_SEGS",              // LineSegs, from LineDefs split by BSP
+    "ML_SSECTORS",          // SubSectors, list of LineSegs
+    "ML_NODES",             // BSP nodes
+    "ML_SECTORS",           // Sectors, from editing
+    "ML_REJECT",            // LUT, sector-sector visibility
+    "ML_BLOCKMAP",          // LUT, motion clipping, walls/grid element
+  };
+
+  if (!mapname)
+  {
+    I_Error("P_SetupLevel: Wrong map name");
+    return MF_UNKNOWN;
+  }
+
+  lumpnum = W_CheckNumForName(mapname);
+
+  if (lumpnum < 0)
+  {
+    I_Error("P_SetupLevel: There is no %s map.", mapname);
+    return MF_UNKNOWN;
+  }
+
+  for (i = ML_THINGS + 1; i <= ML_SECTORS; i++)
+  {
+    if (!P_CheckLumpsForSameSource(lumpnum, lumpnum + i))
+    {
+      I_Error("P_SetupLevel: Level wad structure is incomplete. There is no %s lump.", ml_labels[i]);
+    }
+  }
+
+  // detect Hexen-format maps, avoid segfaults
+  i = lumpnum + ML_BLOCKMAP + 1;
+  if (P_CheckLumpsForSameSource(lumpnum, i))
+  {
+    if (!strnicmp(lumpinfo[i].name, "BEHAVIOR", 8))
+    {
+      lprintf(LO_INFO, "P_SetupLevel: %s: Hexen format detected\n", mapname);
+      return MF_HEXEN;
+    }
+  }
+
+  return MF_DOOM;
+}
+
+
 /*
 =================
 =
@@ -1747,6 +1887,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    char  gl_lumpname[9];
    int   gl_lumpnum;
+
+   mapformat_t mapformat;
 
 #ifndef __LIBRETRO__
    R_StopAllInterpolations();
@@ -1798,10 +1940,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // killough 4/4/98: split load of sidedefs into two parts,
    // to allow texture names to be used in special linedefs
 
-   // refuse to load Hexen-format maps, avoid segfaults
-   if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
-         && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8))
-      I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
+   // Avoid segfaults on levels without nodes.
+   mapformat = P_CheckLevelWadStructure(lumpname);
+   if (mapformat == MF_UNKNOWN)
+     return;
 
    // figgi 10/19/00 -- check for gl lumps and load them
    P_GetNodesVersion(lumpnum,gl_lumpnum);
@@ -1812,7 +1954,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       P_LoadVertexes  (lumpnum+ML_VERTEXES);
    P_LoadSectors   (lumpnum+ML_SECTORS);
    P_LoadSideDefs  (lumpnum+ML_SIDEDEFS);
-   P_LoadLineDefs  (lumpnum+ML_LINEDEFS);
+   P_LoadLineDefs  (lumpnum+ML_LINEDEFS, mapformat);
    P_LoadSideDefs2 (lumpnum+ML_SIDEDEFS);
    P_LoadLineDefs2 (lumpnum+ML_LINEDEFS);
    P_LoadBlockMap  (lumpnum+ML_BLOCKMAP);
@@ -1857,7 +1999,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_MapStart();
 
-   P_LoadThings(lumpnum+ML_THINGS);
+   P_LoadThings(lumpnum+ML_THINGS, mapformat);
 
    // if deathmatch, randomly spawn the active players
    if (deathmatch)
