@@ -25,16 +25,28 @@
 #ifndef __UF_GAMEINFO_H__
 #define __UF_GAMEINFO_H__
 
+
+#define HAS_EPISODE1    0x01
+#define HAS_EPISODE2    0x02
+#define HAS_EPISODE4    0x04
+#define HAS_MAP32       0x08
+#define HAS_RAVEN_LUMPS 0x0F // has raven lumps (ADVISOR, TINTTAB, SNDCURVE)
+#define IS_FREEDOOM     0x10
+
+
 // ------------
 //
 // ------------
 typedef struct
 {
   // game loading
-  char *banner;    // text to print on startup
-  char *iwadFile; // name of the iwad file to use
-  char **wadFiles; // additional wad files to look for (eg. prboom.wad)
-  char *firstMap; // first map of the WAD
+  char *banner;     // text to print on startup
+  char *iwadFile;   // name of the iwad file to use
+  char **wadFiles;  // additional wad files to look for (eg. prboom.wad)
+  char *firstMap;   // first map of the WAD
+  byte detectflags; // used for detection of standard IWADs
+  GameMode_t gamemode;
+  GameMission_t mission;
 } gameinfo_t;
 
 

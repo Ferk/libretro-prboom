@@ -30,7 +30,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 
-#include "doomtype.h"
+#include "doomdef.h"
 #include "lprintf.h"
 #include "uf_scanner.h"
 
