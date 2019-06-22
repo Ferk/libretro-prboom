@@ -9,6 +9,17 @@
 #define MAP01        "MAP01"
 #define E1M1         "E1M1"
 
+static const char *doomSkullCursorPatches[] =
+{
+   "M_SKULL1",
+   "M_SKULL2",
+};
+static const blinkpatches_t doomSkullCursor = {
+  8, // blinktime
+  2, // numpatches
+  doomSkullCursorPatches // patches
+};
+
 
 // list of standard IWAD information
 const gameinfo_t standard_iwads[]=
@@ -21,6 +32,7 @@ const gameinfo_t standard_iwads[]=
   HAS_MAP32,
   commercial,
   doom2,
+  &doomSkullCursor,
  },
  {
   "Final DOOM: Plutonia Experiment",
@@ -30,6 +42,7 @@ const gameinfo_t standard_iwads[]=
   HAS_MAP32,
   commercial,
   pack_plut,
+  &doomSkullCursor,
  },
  {
   "Final DOOM: TNT - Evilution",
@@ -39,6 +52,7 @@ const gameinfo_t standard_iwads[]=
   HAS_MAP32,
   commercial,
   pack_tnt,
+  &doomSkullCursor,
  },
  {
   "Freedoom Phase 2",
@@ -48,6 +62,7 @@ const gameinfo_t standard_iwads[]=
   HAS_MAP32,
   commercial,
   doom2,
+  &doomSkullCursor,
  },
  {
   "DOOM Registered version",
@@ -57,6 +72,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2,
   registered,
   doom,
+  &doomSkullCursor,
  },
  {
   "The Ultimate DOOM",
@@ -66,6 +82,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2|HAS_EPISODE4,
   retail,
   doom,
+  &doomSkullCursor,
  },
  {
   "Freedoom: Phase 1",
@@ -75,6 +92,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2|IS_FREEDOOM,
   retail,
   doom,
+  &doomSkullCursor,
  },
  {
   "Freedoom: Phase 1",
@@ -84,6 +102,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2|HAS_EPISODE4,
   retail,
   doom,
+  &doomSkullCursor,
  },
  {
   "DOOM Shareware version",
@@ -93,6 +112,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1,
   commercial,
   doom,
+  &doomSkullCursor,
  },
  {
   "Heretic Shareware version",
@@ -102,6 +122,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_RAVEN_LUMPS,
   shareware,
   doom,
+  &doomSkullCursor,
  },
  {
   "Heretic Registered version",
@@ -111,6 +132,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2|HAS_RAVEN_LUMPS,
   shareware,
   doom,
+  &doomSkullCursor,
  },
  {
   "Heretic: Shadow of the Serpent Riders",
@@ -120,6 +142,7 @@ const gameinfo_t standard_iwads[]=
   HAS_EPISODE1|HAS_EPISODE2|HAS_EPISODE4|HAS_RAVEN_LUMPS,
   shareware,
   doom,
+  &doomSkullCursor,
   },
 };
 static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;

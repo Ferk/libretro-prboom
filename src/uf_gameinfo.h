@@ -34,6 +34,15 @@
 #define IS_FREEDOOM     0x10
 
 
+// Menu cursor
+typedef struct
+{
+   int blinktime;
+   int numpatches;
+   const char **patches;
+} blinkpatches_t;
+
+
 // ------------
 //
 // ------------
@@ -47,6 +56,10 @@ typedef struct
   byte detectflags; // used for detection of standard IWADs
   GameMode_t gamemode;
   GameMission_t mission;
+
+  // menu stuff
+  blinkpatches_t *menuCursor;   // blinking menu cursor (ie. skull)
+
 } gameinfo_t;
 
 
