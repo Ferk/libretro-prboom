@@ -491,7 +491,7 @@ void S_ChangeMusic(int musicnum, int looping)
     }
   }
 
-  if (music_file_failed)
+  if (music_file_failed && music->lumpnum != -1)
   {
     //cournia - could not load music file, play default MIDI music
     // load & register it
