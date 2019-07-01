@@ -2696,6 +2696,7 @@ void G_DoPlayDemo(void)
 
   /* cph - store lump number for unlocking later */
   demolumpnum = W_GetNumForName(basename);
+  if (demolumpnum == -1) return;
   demobuffer = W_CacheLumpNum(demolumpnum);
   demolength = W_LumpLength(demolumpnum);
 
