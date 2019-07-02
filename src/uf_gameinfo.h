@@ -42,6 +42,12 @@ typedef struct
    const char **patches;
 } blinkpatches_t;
 
+// Demo state for demo sequence
+typedef struct {
+  void (*func)(const char *);
+  const char *name;
+} demostate_t;
+
 
 // ------------
 //
@@ -58,7 +64,11 @@ typedef struct
   GameMission_t mission;
 
   // menu stuff
-  blinkpatches_t *menuCursor;   // blinking menu cursor (ie. skull)
+  char *menuHeader;  // header image to show on top of the main menu
+  blinkpatches_t *menuCursor; // blinking menu cursor (ie. skull)
+  demostate_t *demostates;    // sequence of title screens/demo states to show on start
+  char *creditBackground;
+  char *menuBackground;
 
 } gameinfo_t;
 

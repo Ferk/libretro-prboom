@@ -160,7 +160,7 @@ static bool CheckIWAD(const char *iwadname, gameinfo_t **iwadinfo)
     for (i=0; i<nstandard_iwads; i++) {
       if (standard_iwads[i].detectflags == detectflags)
       {
-        *iwadinfo = &standard_iwads[i];
+        *iwadinfo = (gameinfo_t*) &standard_iwads[i];
         break;
       }
     }
@@ -181,6 +181,15 @@ void UF_ApplyIWADInfo(const gameinfo_t *iwadinfo)
     gameinfo.banner = iwadinfo->banner;
   if (!gameinfo.firstMap)
     gameinfo.firstMap = iwadinfo->firstMap;
+
+if (!gameinfo.menuHeader)
+    gameinfo.menuHeader = iwadinfo->menuHeader;
+  if (!gameinfo.menuCursor)
+    gameinfo.menuCursor = iwadinfo->menuCursor;
+  if (!gameinfo.demostates)
+    gameinfo.demostates = iwadinfo->demostates;
+  if (!gameinfo.creditBackground)
+    gameinfo.creditBackground = iwadinfo->creditBackground;
 
   gamemode = iwadinfo->gamemode;
   gamemission = iwadinfo->mission;

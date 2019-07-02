@@ -370,77 +370,75 @@ static void D_DrawTitle2(const char *name)
   D_SetPageName(name);
 }
 
-/* killough 11/98: tabulate demo sequences
+/******************
+ * Demo sequences
  */
 
-static struct
+const demostate_t demostates_doom[] =
 {
-  void (*func)(const char *);
-  const char *name;
-} const demostates[][4] =
-  {
-    {
-      {D_DrawTitle1, "TITLEPIC"},
-      {D_DrawTitle1, "TITLEPIC"},
-      {D_DrawTitle2, "TITLEPIC"},
-      {D_DrawTitle1, "TITLEPIC"},
-    },
+   { D_DrawTitle1,      "TITLEPIC" }, // shareware, registered
+   { G_DeferedPlayDemo, "DEMO1"    },
+   { D_SetPageName,     NULL       },
+   { G_DeferedPlayDemo, "DEMO2"    },
+   { D_SetPageName,     "HELP2"    },
+   { G_DeferedPlayDemo, "DEMO3"    },
+   { NULL }
+};
 
-    {
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-      {G_DeferedPlayDemo, "demo1"},
-    },
-    {
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-      {D_SetPageName, NULL},
-    },
+const demostate_t demostates_doom2[] =
+{
+   { D_DrawTitle2,      "TITLEPIC" }, // commercial
+   { G_DeferedPlayDemo, "DEMO1"    },
+   { D_SetPageName,     NULL       },
+   { G_DeferedPlayDemo, "DEMO2"    },
+   { D_SetPageName,     "CREDIT"   },
+   { G_DeferedPlayDemo, "DEMO3"    },
+   { NULL }
+};
 
-    {
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-      {G_DeferedPlayDemo, "demo2"},
-    },
+const demostate_t demostates_udoom[] =
+{
+   { D_DrawTitle1,      "TITLEPIC" }, // retail
+   { G_DeferedPlayDemo, "DEMO1"    },
+   { D_SetPageName,     NULL       },
+   { G_DeferedPlayDemo, "DEMO2"    },
+   { D_DrawTitle1,      "TITLEPIC" },
+   { G_DeferedPlayDemo, "DEMO3"    },
+   { D_SetPageName,     "CREDIT"   },
+   { G_DeferedPlayDemo, "DEMO4"    },
+   { NULL }
+};
 
-    {
-      {D_SetPageName, "HELP2"},
-      {D_SetPageName, "HELP2"},
-      {D_SetPageName, "CREDIT"},
-      {D_DrawTitle1,  "TITLEPIC"},
-    },
+const demostate_t demostates_hsw[] =
+{
+   { D_DrawTitle1,      "TITLE" }, // heretic shareware
+   //{ D_DrawTitleA,      "TITLE" },
+   //{ G_DeferedPlayDemo, "DEMO1" },
+   { D_SetPageName,     "ORDER" },
+   //{ G_DeferedPlayDemo, "DEMO2" },
+   { D_SetPageName,     NULL    },
+   //{ G_DeferedPlayDemo, "DEMO3" },
+   { NULL }
+};
 
-    {
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-      {G_DeferedPlayDemo, "demo3"},
-    },
+const demostate_t demostates_hreg[] =
+{
+   { D_DrawTitle1,      "TITLE"  }, // heretic registered/sosr
+   //{ D_DrawTitleA,      "TITLE"  },
+   { G_DeferedPlayDemo, "DEMO1"  },
+   { D_SetPageName,     "CREDIT" },
+   { G_DeferedPlayDemo, "DEMO2"  },
+   { D_SetPageName,     NULL     },
+   { G_DeferedPlayDemo, "DEMO3"  },
+   { NULL }
+};
 
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {D_SetPageName, "CREDIT"},
-    },
+const demostate_t demostates_unknown[] =
+{
+   { D_SetPageName, NULL },
+   { NULL }
+};
 
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {G_DeferedPlayDemo, "demo4"},
-    },
-
-    {
-      {NULL},
-      {NULL},
-      {NULL},
-      {NULL},
-    }
-  };
 
 /*
  * This cycles through the demo sequences.
@@ -463,10 +461,10 @@ void D_DoAdvanceDemo(void)
   }
 #endif
 
-  if (!demostates[++demosequence][gamemode].func)
+  if (!gameinfo.demostates[++demosequence].func)
     demosequence = 0;
-  demostates[demosequence][gamemode].func
-    (demostates[demosequence][gamemode].name);
+  gameinfo.demostates[demosequence].func
+    (gameinfo.demostates[demosequence].name);
 }
 
 //
@@ -476,6 +474,10 @@ void D_StartTitle (void)
 {
   gameaction = ga_nothing;
   demosequence = -1;
+
+  if (!gameinfo.demostates)
+     gameinfo.demostates = demostates_unknown;
+
   D_AdvanceDemo();
 }
 
@@ -554,7 +556,7 @@ static void NormalizeSlashes(char *str)
  *
  * Returns TRUE if a valid IWAD was found, false otherwise.
  */
-static const boolean IdentifyIWAD(void)
+static boolean IdentifyIWAD(void)
 {
   int   i;
 

@@ -62,6 +62,7 @@
 #include "i_sound.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "uf_gameinfo.h"
 
 #include <libretro.h>
 
@@ -186,13 +187,8 @@ typedef struct menu_s
   short           lastOn;       // last item user was on in menu
 } menu_t;
 
-short itemOn;           // menu item skull is on (for Big Font menus)
-short skullAnimCounter; // skull animation counter
-short whichSkull;       // which skull to draw (he blinks)
-
-// graphic name of skulls
-
-const char skullName[2][/*8*/9] = {"M_SKULL1","M_SKULL2"};
+short itemOn;       // menu item skull is on (for Big Font menus)
+short menuTime;     // amount of tics in menu (for animations such as Doom skull cursor blinking)
 
 menu_t* currentMenu; // current menudef
 
@@ -370,7 +366,7 @@ menu_t MainDef =
 void M_DrawMainMenu(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
+  V_DrawNamePatch(94, 2, 0, gameinfo.menuHeader, CR_DEFAULT, VPT_STRETCH);
 }
 
 /////////////////////////////
@@ -1679,6 +1675,7 @@ static void M_DrawItem(const setup_menu_t* s)
   int y = s->m_y;
   int flags = s->m_flags;
   if (flags & S_RESET)
+  {
 
     // This item is the reset button
     // Draw the 'off' version if this isn't the current menu item
@@ -1686,10 +1683,10 @@ static void M_DrawItem(const setup_menu_t* s)
 
     // proff/nicolas 09/20/98 -- changed for hi-res
     // CPhipps - Patch drawing updated, reformatted
-
-    V_DrawNamePatch(x, y, 0, ResetButtonName[(flags & (S_HILITE|S_SELECT)) ? whichSkull : 0],
+    int whichpatch = (menuTime/8)%2;
+    V_DrawNamePatch(x, y, 0, ResetButtonName[(flags & (S_HILITE|S_SELECT)) ? whichpatch : 0],
         CR_DEFAULT, VPT_STRETCH);
-
+  }
   else { // Draw the item string
     char *p, *t;
     int w = 0;
@@ -1963,9 +1960,8 @@ static void M_DrawDefVerify(void)
     V_DrawBox(&boxdiag, 0);
   }
 
-  // The blinking messages is keyed off of the blinking of the
-  // cursor skull.
-  if (whichSkull) { // blink the text
+  // The message blinks every 8 menu tics
+  if ((menuTime/8)%2) {
     strcpy(menu_buffer,"Reset to defaults? (Y or N)");
     M_DrawMenuString(VERIFYBOXXORG+8,VERIFYBOXYORG+8,CR_RED);
   }
@@ -3976,7 +3972,7 @@ void M_DrawCredits(void)     // killough 10/98: credit screen
 {
   inhelpscreens = TRUE;
   // Use V_DrawBackground here deliberately to force drawing a background
-  V_DrawBackground(gamemode==shareware ? "CEIL5_1" : "MFLR8_4", 0);
+  V_DrawBackground(gameinfo.creditBackground, 0);
   M_DrawTitle(115, 9, "PRBOOM", CR_GOLD,
               PACKAGE_NAME " v" PACKAGE_VERSION, CR_GOLD);
   M_DrawScreenItems(cred_settings);
@@ -5044,49 +5040,52 @@ void M_Drawer (void)
     }
   else
     if (menuactive)
+    {
+      int x,y,max,i;
+      int lumps_missing = 0;
+
+      menuactive = mnact_float; // Boom-style menu drawers will set mnact_full
+
+      if (currentMenu->routine)
+        currentMenu->routine();     // call Draw routine
+
+      // DRAW MENU
+
+      x = currentMenu->x;
+      y = currentMenu->y;
+      max = currentMenu->numitems;
+
+      for (i = 0; i < max; i++)
+        if (currentMenu->menuitems[i].name[0])
+          if (W_CheckNumForName(currentMenu->menuitems[i].name) < 0)
+            lumps_missing++;
+
+      if (lumps_missing == 0)
+        for (i=0;i<max;i++)
+        {
+          if (currentMenu->menuitems[i].name[0])
+            V_DrawNamePatch(x,y,0,currentMenu->menuitems[i].name,
+                CR_DEFAULT, VPT_STRETCH);
+          y += LINEHEIGHT;
+        }
+      else
+        for (i = 0; i < max; i++)
+        {
+          const char *alttext = currentMenu->menuitems[i].alttext;
+          if (alttext)
+            M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
+          y += LINEHEIGHT;
+        }
+
+      // DRAW SKULL
+
+      // CPhipps - patch drawing updated
       {
-  int x,y,max,i;
-  int lumps_missing = 0;
-
-  menuactive = mnact_float; // Boom-style menu drawers will set mnact_full
-
-  if (currentMenu->routine)
-    currentMenu->routine();     // call Draw routine
-
-  // DRAW MENU
-
-  x = currentMenu->x;
-  y = currentMenu->y;
-  max = currentMenu->numitems;
-
-  for (i = 0; i < max; i++)
-    if (currentMenu->menuitems[i].name[0])
-      if (W_CheckNumForName(currentMenu->menuitems[i].name) < 0)
-        lumps_missing++;
-
-  if (lumps_missing == 0)
-    for (i=0;i<max;i++)
-    {
-      if (currentMenu->menuitems[i].name[0])
-        V_DrawNamePatch(x,y,0,currentMenu->menuitems[i].name,
-            CR_DEFAULT, VPT_STRETCH);
-      y += LINEHEIGHT;
-    }
-  else
-    for (i = 0; i < max; i++)
-    {
-      const char *alttext = currentMenu->menuitems[i].alttext;
-      if (alttext)
-        M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
-      y += LINEHEIGHT;
-    }
-
-  // DRAW SKULL
-
-  // CPhipps - patch drawing updated
-  V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
-      skullName[whichSkull], CR_DEFAULT, VPT_STRETCH);
+        int whichpatch = menuTime % gameinfo.menuCursor->numpatches;
+        V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
+                        gameinfo.menuCursor->patches[ whichpatch ], CR_DEFAULT, VPT_STRETCH);
       }
+    }
 }
 
 //
@@ -5123,11 +5122,12 @@ void M_SetupNextMenu(menu_t *menudef)
 //
 void M_Ticker (void)
 {
-  if (--skullAnimCounter <= 0)
-    {
-      whichSkull ^= 1;
-      skullAnimCounter = 8;
-    }
+  menuTime++;
+  /*if (++blinkTimer >= gameinfo.menuCursor->blinktime)
+  {
+    blinkCounter++;
+    blinkTimer = 0;
+  }*/
 }
 
 /////////////////////////////
@@ -5349,8 +5349,7 @@ void M_Init(void)
   currentMenu = &MainDef;
   menuactive = mnact_inactive;
   itemOn = currentMenu->lastOn;
-  whichSkull = 0;
-  skullAnimCounter = 10;
+  menuTime = 0;
   messageToPrint = 0;
   messageString = NULL;
   messageLastMenuActive = menuactive;
