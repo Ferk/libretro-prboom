@@ -1010,6 +1010,9 @@ void I_StartTic (void)
    int mx, my;
    static bool old_input_kb[117];
    bool new_input_kb[117];
+   static int old_touchx = -1;
+   static int old_touchy = -1;
+   unsigned touch_count;
    int16_t ret = 0;
 
    input_poll_cb();
@@ -1077,6 +1080,39 @@ void I_StartTic (void)
          break;
       }
    }
+
+    /* Touch Input */
+    touch_count = input_state_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_COUNT);
+    if(touch_count > 0)
+    {
+        int touchx=-1, touchy=-1;
+        for(i=0; i < touch_count; i++)
+        {
+            // Use the leftmost finger to control camera
+            int tx = input_state_cb(0, RETRO_DEVICE_POINTER, i, RETRO_DEVICE_ID_POINTER_X);
+            if (tx > touchx) {
+                touchx = tx;
+                touchy = input_state_cb(0, RETRO_DEVICE_POINTER, i, RETRO_DEVICE_ID_POINTER_Y);
+            }
+        }
+
+        if (old_touchx == -1)
+          old_touchx = touchx;
+        else
+        {
+            event_t event_mouse = {0};
+            event_mouse.type = ev_mouse;
+            cur_mx += touchx;
+            cur_my += touchy;
+            event_mouse.data2 = cur_mx * 4;
+            event_mouse.data3 = cur_my * 4;
+            D_PostEvent(&event_mouse);
+        }
+    }
+    else
+    {   /* Fingers were removed, reset positions */
+        old_touchx = old_touchy = -1;
+    }
 
    if (mouse_on || doom_devices[0] == RETRO_DEVICE_KEYBOARD)
    {
