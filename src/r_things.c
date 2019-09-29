@@ -509,12 +509,24 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (D_abs(tx)>(tz<<2))
       return;
 
+   // Do not attempt to render special TNT1 invisible sprite
+   if (thing->sprite == SPR_TNT1) return;
+
    // decide which patch to use for sprite relative to player
    sprdef = &sprites[thing->sprite];
 
    if (!sprdef->spriteframes)
-      I_Error ("R_ProjectSprite: Missing spriteframes %i : %i", thing->sprite,
-            thing->frame);
+   {
+      I_Error ("R_ProjectSprite: Using fallback for missing spriteframes (sprite %i : frame %i)!",
+               thing->sprite, thing->frame);
+      *sprdef = sprites[SPR_APLS]; // using APLS as fallback
+      if (!sprdef->spriteframes)
+      {
+         I_Error ("R_ProjectSprite: fallback frame missing! sprite won't be rendered");
+         *sprdef = sprites[SPR_TNT1];
+         return;
+      }
+   }
 
    sprframe = &sprdef->spriteframes[thing->frame & FF_FRAMEMASK];
 
