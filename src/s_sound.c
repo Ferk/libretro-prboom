@@ -461,7 +461,10 @@ void S_ChangeMusic(int musicnum, int looping)
     return;
 
   if (musicnum <= mus_None || musicnum >= NUMMUSIC)
+  {
     I_Error("S_ChangeMusic: Bad music number %d", musicnum);
+    return;
+  }
 
   music = &S_music[musicnum];
 
@@ -477,6 +480,10 @@ void S_ChangeMusic(int musicnum, int looping)
     char namebuf[9];
     sprintf(namebuf, "d_%s", music->name);
     music->lumpnum = W_GetNumForName(namebuf);
+  }
+  if (music->lumpnum < 0) {
+    I_Error("S_ChangeMusic: No valid music lump");
+    return;
   }
   music_file_failed = 1;
 
