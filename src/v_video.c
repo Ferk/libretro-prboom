@@ -54,6 +54,9 @@ const uint8_t *colrngs[CR_LIMIT];
 
 int usegamma;
 
+// width of the screen norrmalized to match 200 height
+int widewidth;
+
 /*
  * V_InitColorTranslation
  *
@@ -256,17 +259,24 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
 
   if (flags & VPT_STRETCH)
   {
-    srcx=srcx*SCREENWIDTH/320;
+    int screenwidth = SCREENWIDTH;
+    if (widewidth > 320) {
+      int offset = (widewidth - 320) / 2;
+      srcx += offset;
+      destx += offset;
+      screenwidth = 320*SCREENHEIGHT/200;
+    }
+
+    srcx=srcx*screenwidth/320;
     srcy=srcy*SCREENHEIGHT/200;
-    width=width*SCREENWIDTH/320;
+    width=width*screenwidth/320;
     height=height*SCREENHEIGHT/200;
-    destx=destx*SCREENWIDTH/320;
+    destx=destx*screenwidth/320;
     desty=desty*SCREENHEIGHT/200;
   }
 
   src = screens[srcscrn].data + SURFACE_BYTE_PITCH * srcy + srcx * SURFACE_PIXEL_DEPTH;
   dest = screens[destscrn].data + SURFACE_BYTE_PITCH * desty + destx * SURFACE_PIXEL_DEPTH;
-
   for ( ; height>0 ; height--)
     {
       memcpy (dest, src, width * SURFACE_PIXEL_DEPTH);
@@ -345,6 +355,7 @@ void V_Init (void)
     screens[i].not_on_heap = FALSE;
     screens[i].height = 0;
   }
+  widewidth = SCREENWIDTH * 200 / SCREENHEIGHT;
 }
 
 //
@@ -369,8 +380,8 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    draw_vars_t olddrawvars = drawvars;
    int col = 0;
    int w   = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
-   int DX  = (SCREENWIDTH<<16) / 320;
-   int DXI = (320<<16) / SCREENWIDTH;
+   int DX  = (SCREENWIDTH<<16) / widewidth;
+   int DXI = (widewidth<<16) / SCREENWIDTH;
    int DY = (SCREENHEIGHT<<16) / 200;
    int DYI = (200<<16) / SCREENHEIGHT;
    const uint8_t *trans = translationtables + 256*((cm-CR_LIMIT)-1);
@@ -381,10 +392,20 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    y -= patch->topoffset;
    x -= patch->leftoffset;
 
-   // CPhipps - auto-no-stretch if not high-res
-   if (flags & VPT_STRETCH)
-      if ((SCREENWIDTH==320) && (SCREENHEIGHT==200))
-         flags &= ~VPT_STRETCH;
+  if (flags & VPT_STRETCH) {
+    // CPhipps - auto-no-stretch if not high-res
+    if ((SCREENWIDTH==320) && (SCREENHEIGHT==200))
+      flags &= ~VPT_STRETCH;
+
+    // ferk - center-crop wide graphics
+    if (patch->width > 320) {
+      x -=  (patch->width - widewidth)/2;
+    }
+    // ferk - adjust offset for widescreen
+    else if (widewidth > 320) {
+      x += (widewidth - 320)/2;
+    }
+  }
 
    // CPhipps - null translation pointer => no translation
    if (!trans)

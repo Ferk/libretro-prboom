@@ -312,7 +312,11 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
   info->geometry.base_height = SCREENHEIGHT;
   info->geometry.max_width = SCREENWIDTH;
   info->geometry.max_height = SCREENHEIGHT;
-  info->geometry.aspect_ratio = 4.0 / 3.0;
+  // 320x200 will be stretched to 4:3 (original Doom)
+  // 512x240 will be stretched to 16:9
+  // 768x400 will be stretched to 16:10
+  // 1728x720 will be stretched to 18:9
+  info->geometry.aspect_ratio = 4 * 200 * SCREENWIDTH / (float) (3 * 320 * SCREENHEIGHT);
 }
 
 
