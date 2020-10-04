@@ -342,6 +342,9 @@ void D_PageTicker(void)
 //
 static void D_PageDrawer(void)
 {
+  // Clear the screen on page change
+  V_FillRect(0, 0, SCREENWIDTH, SCREENHEIGHT, 0);
+
   // proff/nicolas 09/14/98 -- now stretchs bitmaps to fullscreen!
   // CPhipps - updated for new patch drawing
   // proff - added M_DrawCredits
