@@ -293,24 +293,24 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
 // FIXME: restore v_video.inl
 #define GETCOL16(col) (VID_PAL16(col, VID_COLORWEIGHTMASK))
 
-// draw a stretched 64x64 flat to the top left corner of the screen
-#define V_DRAWFLAT(SCRN, TYPE, GETCOL) { \
-  const int width = (64 * SCREENWIDTH) / 320; \
-  int height = (64 * SCREENHEIGHT) / 200; \
-  fixed_t dx = (320 << FRACBITS) / SCREENWIDTH; \
-  TYPE *dest = (TYPE *)screens[SCRN].data; \
-  \
-  while (height--) { \
-    const uint8_t *const src_row = src + 64*((height*200)/SCREENHEIGHT); \
-    TYPE *const dst_row = dest + SURFACE_SHORT_PITCH * height; \
-    int x; \
-    fixed_t tx; \
-    \
-    for (x=0, tx=0; x<width; x++, tx += dx) { \
-      uint8_t col = src_row[tx >> FRACBITS]; \
-      dst_row[x] = GETCOL(col); \
-    } \
-  } \
+// draw a stretched 64x64 flat to the provided destination coordinates
+// it'll be cropped if width or height don't fit the stretched 64x64 flat
+void V_DrawFlat(int x, int y, int scrn, int width, int height, const uint8_t *src) {
+  fixed_t dx = (downscaledwidth << FRACBITS) / SCREENWIDTH;
+  int16_t *dest = (int16_t *)screens[scrn].data + SURFACE_SHORT_PITCH * y;
+
+  while (height--) {
+    const uint8_t *const src_row = src + 64*((height*200)/SCREENHEIGHT);
+    int16_t *const dst_row = dest + SURFACE_SHORT_PITCH * height;
+    int dst_x;
+    int dst_max = x + width;
+    fixed_t tx;
+
+    for (dst_x=x, tx=0; dst_x < dst_max; dst_x++, tx += dx) {
+      uint8_t col = src_row[tx >> FRACBITS];
+      dst_row[dst_x] = GETCOL16(col);
+    }
+  }
 }
 
 void V_DrawBackground(const char* flatname, int scrn)
@@ -318,14 +318,14 @@ void V_DrawBackground(const char* flatname, int scrn)
   /* erase the entire screen to a tiled background */
   int         x,y;
   int         lump;
-  const int   w = (64*SCREENWIDTH/320), h = (64*SCREENHEIGHT/200);
+  const int   w = (64*SCREENWIDTH/downscaledwidth), h = (64*SCREENHEIGHT/200);
 
   // killough 4/17/98:
   const uint8_t *src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
 
-  V_DRAWFLAT(scrn, int16_t, GETCOL16);
+  V_DrawFlat(0, 0, scrn, w, h, src);
 
   /* end V_DrawBlock */
 
@@ -335,6 +335,34 @@ void V_DrawBackground(const char* flatname, int scrn)
      ((SCREENHEIGHT-y) < h) ? (SCREENHEIGHT-y) : h, x, y, scrn, VPT_NONE);
   W_UnlockLumpNum(lump);
 }
+
+// ferk: fill up a section with a tiling flat
+void V_FillFlat(const char* flatname, int scrn, int x, int y, int width, int height)
+{
+  const int      lump = firstflat + R_FlatNumForName(flatname);
+  const uint8_t *src  = W_CacheLumpNum(lump);
+  const int w = (MIN(64, width)*SCREENWIDTH/downscaledwidth);
+  const int h = (MIN(64, height)*SCREENHEIGHT/200);
+  x = x * SCREENWIDTH / downscaledwidth;
+  y = y * SCREENHEIGHT / 200;
+
+  V_DrawFlat(x, y, scrn, w, h, src);
+
+  // fill up the remaining area
+  if (width > 64 || height > 64)
+  {
+    int tx,ty;
+    width = width * SCREENWIDTH / downscaledwidth;
+    height = height * SCREENHEIGHT / 200;
+
+    for (ty=0 ; ty<height ; ty+=h)
+      for (tx=(ty?0:w); tx<width ; tx+=w)
+        V_CopyRect(x, y, scrn, MIN(width-tx, w), MIN(height-ty, h),
+           x+tx, y+ty, scrn, VPT_NONE);
+  }
+  W_UnlockLumpNum(lump);
+}
+
 
 //
 // V_Init

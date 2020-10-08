@@ -389,6 +389,11 @@ static void ST_refreshBackground(void)
 
   if (st_statusbaron)
     {
+      // ferk: on widescreen, draw a backdrop texture for the status bar
+      if (downscaledwidth > stbarbg.width)
+        V_FillFlat((gamemode == commercial ? "GRNROCK" : "FLOOR7_2"), BG,
+           0, 0, downscaledwidth, ST_HEIGHT);
+
       // proff 05/17/2000: draw to the frontbuffer in OpenGL
       V_DrawNumPatch(ST_X, y, BG, stbarbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
       if (st_armson)

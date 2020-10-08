@@ -151,6 +151,9 @@ extern void V_DrawNumPatch(int x, int y, int scrn,
 /* cphipps 10/99: function to tile a flat over the screen */
 extern void V_DrawBackground(const char* flatname, int scrn);
 
+// ferk: fill up a section with a tiling flat
+void V_FillFlat(const char* flatname, int scrn, int x, int y, int width, int height);
+
 void V_DestroyUnusedTrueColorPalettes(void);
 // CPhipps - function to set the palette to palette number pal.
 void V_SetPalette(int pal);
