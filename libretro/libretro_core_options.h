@@ -30,7 +30,7 @@ struct retro_core_option_definition option_defs_us[] = {
    {
       "prboom-resolution",
       "Internal resolution (restart)",
-      "Configure the resolution. Requires a restart.",
+      "Configure the resolution. Requires a restart. The matching aspect ratio keeps the original Doom proportions.",
       {
          { "320x200 (4:3)", NULL },
          { "640x400 (4:3)", NULL },
@@ -43,9 +43,12 @@ struct retro_core_option_definition option_defs_us[] = {
          { "1280x800 (4:3)", NULL },
          { "1600x1000 (4:3)", NULL },
          { "1920x1200 (4:3)", NULL },
+         { "2560x1200 (16:9)", NULL },
+         { "2880x1200 (18:9)", NULL },
          { "2240x1400 (4:3)", NULL },
-         { "2560x1440 (4:3)", NULL },
+         { "2560x1440 (40:27)", NULL },
          { "2560x1600 (4:3)", NULL },
+         { "3072x1600 (16:10)", NULL },
          { NULL, NULL },
       },
       "320x200"
