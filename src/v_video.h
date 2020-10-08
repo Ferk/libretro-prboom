@@ -62,6 +62,11 @@ typedef struct {
 extern screeninfo_t screens[NUM_SCREENS];
 extern int          usegamma;
 
+// what SCREENWIDTH would be with height 200 (= 320 if not widescreen)
+extern int downscaledwidth;
+// screen X offset differing from 320 on each side (= 0 if 320/200 ratio)
+extern int widescreenoffset;
+
 // symbolic indices into color translation table pointer array
 typedef enum
 {

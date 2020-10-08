@@ -53,9 +53,8 @@ screeninfo_t screens[NUM_SCREENS];
 const uint8_t *colrngs[CR_LIMIT];
 
 int usegamma;
-
-// width of the screen norrmalized to match 200 height
-int widewidth;
+int downscaledwidth;
+int widescreenoffset;
 
 /*
  * V_InitColorTranslation
@@ -260,10 +259,9 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
   if (flags & VPT_STRETCH)
   {
     int screenwidth = SCREENWIDTH;
-    if (widewidth > 320) {
-      int offset = (widewidth - 320) / 2;
-      srcx += offset;
-      destx += offset;
+    if (widescreenoffset != 0) {
+      srcx += widescreenoffset;
+      destx += widescreenoffset;
       screenwidth = 320*SCREENHEIGHT/200;
     }
 
@@ -355,7 +353,8 @@ void V_Init (void)
     screens[i].not_on_heap = FALSE;
     screens[i].height = 0;
   }
-  widewidth = SCREENWIDTH * 200 / SCREENHEIGHT;
+  downscaledwidth = SCREENWIDTH * 200 / SCREENHEIGHT;
+  widescreenoffset = (downscaledwidth - 320) / 2;
 }
 
 //
@@ -380,8 +379,8 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    draw_vars_t olddrawvars = drawvars;
    int col = 0;
    int w   = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
-   int DX  = (SCREENWIDTH<<16) / widewidth;
-   int DXI = (widewidth<<16) / SCREENWIDTH;
+   int DX  = (SCREENWIDTH<<16) / downscaledwidth;
+   int DXI = (downscaledwidth<<16) / SCREENWIDTH;
    int DY = (SCREENHEIGHT<<16) / 200;
    int DYI = (200<<16) / SCREENHEIGHT;
    const uint8_t *trans = translationtables + 256*((cm-CR_LIMIT)-1);
@@ -399,11 +398,11 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
 
     // ferk - center-crop wide graphics
     if (patch->width > 320) {
-      x -=  (patch->width - widewidth)/2;
+      x -=  (patch->width - downscaledwidth)/2;
     }
     // ferk - adjust offset for widescreen
-    else if (widewidth > 320) {
-      x += (widewidth - 320)/2;
+    else if (widescreenoffset != 0) {
+      x += widescreenoffset;
     }
   }
 

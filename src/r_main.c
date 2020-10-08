@@ -437,7 +437,7 @@ void R_ExecuteSetViewSize (void)
   centeryfrac = centery<<FRACBITS;
   projection = centerxfrac;
 // proff 11/06/98: Added for high-res
-  projectiony = ((SCREENHEIGHT * centerx * 320) / 200) / SCREENWIDTH * FRACUNIT;
+  projectiony = ((SCREENHEIGHT * centerx * downscaledwidth) / 200) / SCREENWIDTH * FRACUNIT;
 
   R_InitBuffer (scaledviewwidth, viewheight);
 
@@ -445,8 +445,8 @@ void R_ExecuteSetViewSize (void)
 
   // psprite scales
 // proff 08/17/98: Changed for high-res
-  pspritescale = FRACUNIT*viewwidth/320;
-  pspriteiscale = FRACUNIT*320/viewwidth;
+  pspritescale = FRACUNIT*viewwidth/downscaledwidth;
+  pspriteiscale = FRACUNIT*downscaledwidth/viewwidth;
 // proff 11/06/98: Added for high-res
   pspriteyscale = (((SCREENHEIGHT*viewwidth)/SCREENWIDTH) << FRACBITS) / 200;
 
